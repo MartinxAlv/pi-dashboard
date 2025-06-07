@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Dashboard Admin</title>
+    <link rel="stylesheet" href="admin.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>🖥️ Pi Dashboard Admin</h1>
+            <div class="connection-status">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="admin-content">
+            <!-- Dashboard Preview -->
+            <section class="preview-section">
+                <h2>📱 Live Preview</h2>
+                <div class="preview-container">
+                    <iframe src="/" class="dashboard-preview" id="dashboard-preview"></iframe>
+                    <div class="preview-overlay">
+                        <div class="current-page-indicator" id="current-page">Page 1: Date & Weather</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tabbed Controls -->
+            <div class="controls-container">
+                <nav class="tab-navigation">
+                    <button class="tab-button active" data-tab="navigation">🧭 Navigation</button>
+                    <button class="tab-button" data-tab="weather">🌤️ Weather</button>
+                    <button class="tab-button" data-tab="theme">🎨 Theme</button>
+                    <button class="tab-button" data-tab="system">⚙️ System</button>
+                    <button class="tab-button" data-tab="actions">🚀 Actions</button>
+                </nav>
+
+                <div class="tab-content">
+                    <!-- Navigation Tab -->
+                    <div class="tab-panel active" id="navigation">
+                        <div class="control-group">
+                            <h3>Page Navigation</h3>
+                            <div class="page-controls">
+                                <button class="btn btn-primary" onclick="changePage(0)">
+                                    🕐 Date & Weather
+                                </button>
+                                <button class="btn btn-primary" onclick="changePage(1)">
+                                    📅 Calendar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Auto Cycle</h3>
+                            <div class="cycle-controls">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="auto-cycle" checked>
+                                    <span class="slider"></span>
+                                    <span class="label">Enable Auto Cycle</span>
+                                </label>
+                                
+                                <div class="input-group">
+                                    <label for="cycle-interval">Cycle Interval (seconds):</label>
+                                    <input type="number" id="cycle-interval" min="3" max="300" value="10">
+                                    <button class="btn btn-secondary" onclick="updateCycleInterval()">Update</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Weather Tab -->
+                    <div class="tab-panel" id="weather">
+                        <div class="control-group">
+                            <h3>API Configuration</h3>
+                            <div class="input-group">
+                                <label for="weather-api-key">API Key:</label>
+                                <input type="password" id="weather-api-key">
+                                <button class="btn btn-secondary" onclick="toggleApiKeyVisibility()">👁️</button>
+                                <button class="btn btn-secondary" onclick="updateApiKey()">Save Key</button>
+                                <button class="btn btn-secondary" onclick="showCurrentApiKey()">Show Current</button>
+                            </div>
+                            
+                            <div class="api-status" id="api-key-status">
+                                <span id="api-key-indicator">No API key saved</span>
+                            </div>
+                            
+                            <div class="api-help">
+                                <p>📝 <strong>Get your free API key:</strong></p>
+                                <ol>
+                                    <li>Go to <a href="https://openweathermap.org/api" target="_blank">openweathermap.org/api</a></li>
+                                    <li>Sign up for a free account</li>
+                                    <li>Copy your API key and paste it above</li>
+                                    <li>Click "Save Key" and then "Test Weather"</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Location Settings</h3>
+                            <div class="input-group">
+                                <label for="weather-city">City:</label>
+                                <input type="text" id="weather-city" value="">
+                                <button class="btn btn-secondary" onclick="updateWeatherCity()">Update</button>
+                            </div>
+                            
+                            <div class="city-format-help">
+                                <p>📍 <strong>City Format Reference:</strong></p>
+                                <div class="format-examples">
+                                    <div class="format-item">
+                                        <strong>US Cities:</strong> Dallas,US • Chicago,US • New York,US • Garland,US • Los Angeles,US
+                                    </div>
+                                    <div class="format-item">
+                                        <strong>International:</strong> London,GB • Paris,FR • Tokyo,JP • Sydney,AU • Toronto,CA
+                                    </div>
+                                </div>
+                                <p class="format-note">💡 Use country codes (US, GB, FR) instead of state codes (TX, CA, NY)</p>
+                                <p class="format-note">✅ <strong>Examples that work:</strong> "Garland,US", "Dallas,US", "Houston,US"</p>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="weather-units">Units:</label>
+                                <select id="weather-units">
+                                    <option value="imperial">Imperial (°F)</option>
+                                    <option value="metric">Metric (°C)</option>
+                                    <option value="kelvin">Kelvin</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="updateWeatherUnits()">Update</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Weather Testing</h3>
+                            <div class="weather-test">
+                                <button class="btn btn-accent" onclick="testWeather()">🌤️ Test Weather</button>
+                                <button class="btn btn-secondary" onclick="refreshWeather()">🔄 Refresh Weather</button>
+                                <button class="btn btn-secondary" onclick="checkApiUsage()">📊 Check API Usage</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Theme Tab -->
+                    <div class="tab-panel" id="theme">
+                        <div class="control-group">
+                            <h3>Color Theme Customizer</h3>
+                            <p>Customize the admin panel colors to your preference. Changes apply instantly!</p>
+                            
+                            <div class="theme-customizer">
+                                <div class="color-picker-grid">
+                                    <div class="color-picker-item">
+                                        <label for="primary-color">Primary Color:</label>
+                                        <input type="color" id="primary-color" class="color-picker" value="#667eea">
+                                        <span class="color-value" id="primary-value">#667eea</span>
+                                    </div>
+                                    
+                                    <div class="color-picker-item">
+                                        <label for="secondary-color">Secondary Color:</label>
+                                        <input type="color" id="secondary-color" class="color-picker" value="#764ba2">
+                                        <span class="color-value" id="secondary-value">#764ba2</span>
+                                    </div>
+                                    
+                                    <div class="color-picker-item">
+                                        <label for="background-start">Background Start:</label>
+                                        <input type="color" id="background-start" class="color-picker" value="#667eea">
+                                        <span class="color-value" id="bg-start-value">#667eea</span>
+                                    </div>
+                                    
+                                    <div class="color-picker-item">
+                                        <label for="background-end">Background End:</label>
+                                        <input type="color" id="background-end" class="color-picker" value="#764ba2">
+                                        <span class="color-value" id="bg-end-value">#764ba2</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="theme-actions">
+                                    <button class="btn btn-secondary" onclick="resetTheme()">🔄 Reset to Default</button>
+                                    <button class="btn btn-primary" onclick="saveTheme()">💾 Save Theme</button>
+                                    <button class="btn btn-accent" onclick="exportTheme()">📤 Export Theme</button>
+                                </div>
+                                
+                                <h4 style="margin: 20px 0 10px 0; color: #333;">Preset Themes:</h4>
+                                <div class="preset-themes">
+                                    <div class="preset-theme" onclick="applyPresetTheme('default')">🌊 Default Blue</div>
+                                    <div class="preset-theme" onclick="applyPresetTheme('purple')">🔮 Purple Dream</div>
+                                    <div class="preset-theme" onclick="applyPresetTheme('green')">🌿 Nature Green</div>
+                                    <div class="preset-theme" onclick="applyPresetTheme('orange')">🌅 Sunset Orange</div>
+                                    <div class="preset-theme" onclick="applyPresetTheme('pink')">🌸 Cherry Blossom</div>
+                                    <div class="preset-theme" onclick="applyPresetTheme('dark')">🌙 Dark Mode</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Tab -->
+                    <div class="tab-panel" id="system">
+                        <div class="control-group">
+                            <h3>System Information</h3>
+                            <div class="system-info">
+                                <div class="info-item">
+                                    <span class="label">Dashboard Status:</span>
+                                    <span class="value" id="dashboard-status">Running</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Current Page:</span>
+                                    <span class="value" id="current-page-info">1</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Last Updated:</span>
+                                    <span class="value" id="last-updated">--</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Weather API:</span>
+                                    <span class="value" id="weather-api-status">Checking...</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Data Storage:</span>
+                                    <span class="value">Server Memory (resets on restart)</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h3>Storage Information</h3>
+                            <div class="storage-info">
+                                <p>💾 <strong>How settings are stored:</strong></p>
+                                <ul>
+                                    <li><strong>API Key & City:</strong> Stored in server memory (Docker container)</li>
+                                    <li><strong>Persistence:</strong> Settings reset when container restarts</li>
+                                    <li><strong>Defaults:</strong> Loaded from .env file on startup</li>
+                                    <li><strong>Browser:</strong> No data stored in browser cache/localStorage</li>
+                                </ul>
+                                <p class="storage-note">🔄 To persist settings across restarts, use the .env file or add a database later.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions Tab -->
+                    <div class="tab-panel" id="actions">
+                        <div class="control-group">
+                            <h3>Quick Actions</h3>
+                            <div class="quick-actions">
+                                <button class="btn btn-large btn-accent" onclick="fullscreenDashboard()">
+                                    📺 Open Dashboard Fullscreen
+                                </button>
+                                <button class="btn btn-large btn-secondary" onclick="refreshAll()">
+                                    🔄 Refresh All Data
+                                </button>
+                                <button class="btn btn-large btn-warning" onclick="resetToDefaults()">
+                                    ⚙️ Reset All Settings
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="admin-footer">
+            <p>Pi Dashboard Admin Panel • Use this interface to control your Raspberry Pi dashboard</p>
+        </footer>
+    </div>
+
+    <script src="admin.js"></script>
+    <script>
+        // Theme customizer functions
+        const presetThemes = {
+            default: {
+                primary: '#667eea',
+                secondary: '#764ba2', 
+                bgStart: '#667eea',
+                bgEnd: '#764ba2'
+            },
+            purple: {
+                primary: '#8B5CF6',
+                secondary: '#A855F7',
+                bgStart: '#8B5CF6', 
+                bgEnd: '#A855F7'
+            },
+            green: {
+                primary: '#059669',
+                secondary: '#065F46',
+                bgStart: '#059669',
+                bgEnd: '#065F46'
+            },
+            orange: {
+                primary: '#EA580C',
+                secondary: '#DC2626',
+                bgStart: '#EA580C',
+                bgEnd: '#DC2626'
+            },
+            pink: {
+                primary: '#EC4899',
+                secondary: '#BE185D',
+                bgStart: '#EC4899',
+                bgEnd: '#BE185D'
+            },
+            dark: {
+                primary: '#374151',
+                secondary: '#1F2937',
+                bgStart: '#374151',
+                bgEnd: '#1F2937'
+            }
+        };
+
+        function updateThemeColors() {
+            const primary = document.getElementById('primary-color').value;
+            const secondary = document.getElementById('secondary-color').value;
+            const bgStart = document.getElementById('background-start').value;
+            const bgEnd = document.getElementById('background-end').value;
+            
+            const root = document.documentElement;
+            root.style.setProperty('--primary-color', primary);
+            root.style.setProperty('--secondary-color', secondary);
+            root.style.setProperty('--accent-color', primary);
+            root.style.setProperty('--background-start', bgStart);
+            root.style.setProperty('--background-end', bgEnd);
+            
+            // Update color value displays
+            document.getElementById('primary-value').textContent = primary;
+            document.getElementById('secondary-value').textContent = secondary;
+            document.getElementById('bg-start-value').textContent = bgStart;
+            document.getElementById('bg-end-value').textContent = bgEnd;
+            
+            // Broadcast theme to dashboard
+            const theme = {
+                primary: primary,
+                secondary: secondary,
+                bgStart: bgStart,
+                bgEnd: bgEnd
+            };
+            
+            // Save to localStorage (dashboard will pick this up)
+            localStorage.setItem('adminTheme', JSON.stringify(theme));
+            
+            // Also send via socket if available
+            if (window.adminPanel && window.adminPanel.socket) {
+                window.adminPanel.socket.emit('themeChange', theme);
+            }
+        }
+
+        function applyPresetTheme(themeName) {
+            const theme = presetThemes[themeName];
+            if (!theme) return;
+            
+            document.getElementById('primary-color').value = theme.primary;
+            document.getElementById('secondary-color').value = theme.secondary;
+            document.getElementById('background-start').value = theme.bgStart;
+            document.getElementById('background-end').value = theme.bgEnd;
+            
+            updateThemeColors();
+        }
+
+        function resetTheme() {
+            applyPresetTheme('default');
+        }
+
+        function saveTheme() {
+            const theme = {
+                primary: document.getElementById('primary-color').value,
+                secondary: document.getElementById('secondary-color').value,
+                bgStart: document.getElementById('background-start').value,
+                bgEnd: document.getElementById('background-end').value,
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('adminTheme', JSON.stringify(theme));
+            alert('Theme saved! It will be restored when you reload the page.');
+        }
+
+        function exportTheme() {
+            const theme = {
+                primary: document.getElementById('primary-color').value,
+                secondary: document.getElementById('secondary-color').value,
+                bgStart: document.getElementById('background-start').value,
+                bgEnd: document.getElementById('background-end').value
+            };
+            
+            const themeData = JSON.stringify(theme, null, 2);
+            const blob = new Blob([themeData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'admin-theme.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadSavedTheme() {
+            const savedTheme = localStorage.getItem('adminTheme');
+            if (savedTheme) {
+                try {
+                    const theme = JSON.parse(savedTheme);
+                    document.getElementById('primary-color').value = theme.primary;
+                    document.getElementById('secondary-color').value = theme.secondary;
+                    document.getElementById('background-start').value = theme.bgStart;
+                    document.getElementById('background-end').value = theme.bgEnd;
+                    updateThemeColors();
+                } catch (e) {
+                    console.warn('Failed to load saved theme:', e);
+                }
+            }
+        }
+
+        // Tab functionality and initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize existing admin panel
+            window.adminPanel = new AdminPanel();
+            
+            // Load saved theme
+            loadSavedTheme();
+            
+            // Add color picker event listeners
+            document.querySelectorAll('.color-picker').forEach(picker => {
+                picker.addEventListener('input', updateThemeColors);
+            });
+            
+            // Listen for page changes from the dashboard iframe
+            window.addEventListener('message', (event) => {
+                // Make sure the message is from our dashboard
+                if (event.data && event.data.type === 'pageChanged') {
+                    updateCurrentPageDisplay(event.data.pageIndex);
+                }
+            });
+            
+            // Add tab functionality
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    // Remove active class from all buttons and panels
+                    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                    
+                    // Add active class to clicked button
+                    button.classList.add('active');
+                    
+                    // Show corresponding panel
+                    const tabId = button.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+        });
+        
+        // Function to update the page indicator display
+        function updateCurrentPageDisplay(pageIndex) {
+            const pageNames = [
+                'Page 1: Date & Weather',
+                'Page 2: Calendar & Events'
+            ];
+            
+            const currentPageElement = document.getElementById('current-page');
+            if (currentPageElement && pageNames[pageIndex]) {
+                currentPageElement.textContent = pageNames[pageIndex];
+            }
+        }
+    </script>
+</body>
+</html>

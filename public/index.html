@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="dashboard" id="dashboard">
+        <!-- Page 1: Date, Time & Weather -->
+        <div class="page datetime-page active" id="page-0">
+            <div class="main-content">
+                <div class="time-display" id="time">--:--</div>
+                <div class="date-display" id="date">Loading...</div>
+                
+                <div class="weather-section" id="weather-section">
+                    <div class="weather-info" id="weather-info">
+                        <div class="weather-icon" id="weather-icon">🌤️</div>
+                        <div class="weather-details">
+                            <div class="temperature" id="temperature">--°</div>
+                            <div class="weather-desc" id="weather-desc">Loading weather...</div>
+                            <div class="weather-location" id="weather-location">--</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 5-Day Forecast -->
+                    <div class="forecast-container" id="forecast-container">
+                        <div class="forecast-title">5-Day Forecast</div>
+                        <div class="forecast-list" id="forecast-list">
+                            <!-- Forecast items will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 2: Calendar & Events -->
+        <div class="page calendar-page" id="page-1">
+            <div class="calendar-header">
+                <h2>📅 Upcoming Events</h2>
+            </div>
+            <div class="events-container">
+                <div class="events-list" id="events-list">
+                    <div class="loading">Loading events...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Navigation Dots -->
+        <div class="page-indicators">
+            <div class="indicator active" data-page="0"></div>
+            <div class="indicator" data-page="1"></div>
+        </div>
+
+        <!-- Touch Navigation Areas (invisible) -->
+        <div class="nav-area nav-left" id="nav-left"></div>
+        <div class="nav-area nav-right" id="nav-right"></div>
+    </div>
+
+    <!-- Status Indicator -->
+    <div class="status-indicator" id="status">●</div>
+    <script src="script.js"></script>
+</body>
+</html>

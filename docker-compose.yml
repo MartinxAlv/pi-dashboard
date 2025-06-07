@@ -1,0 +1,47 @@
+services:
+  dashboard:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for development (hot reload)
+      - .:/app
+      - /app/node_modules
+      # Persistent data storage
+      - dashboard_data:/app/data
+      - dashboard_uploads:/app/uploads
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      - DEFAULT_CITY=${DEFAULT_CITY:-Dallas,US}
+      - DEFAULT_UNITS=${DEFAULT_UNITS:-imperial}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - AUTO_CYCLE_INTERVAL=${AUTO_CYCLE_INTERVAL:-10000}
+      - DISPLAY_WIDTH=${DISPLAY_WIDTH:-800}
+      - DISPLAY_HEIGHT=${DISPLAY_HEIGHT:-480}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # For Raspberry Pi, uncomment the platform line below
+    # platform: linux/arm64
+
+  # Optional: Add a database service if you want to use PostgreSQL instead of SQLite
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: dashboard
+  #     POSTGRES_USER: dashboard
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+volumes:
+  dashboard_data:
+  dashboard_uploads:
+  # postgres_data:

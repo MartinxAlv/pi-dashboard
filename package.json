@@ -1,0 +1,42 @@
+{
+  "name": "pi-dashboard",
+  "version": "1.0.0",
+  "description": "Raspberry Pi Touch Dashboard with Docker",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up",
+    "docker:up-d": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:rebuild": "docker-compose down && docker-compose build --no-cache && docker-compose up",
+    "pi:build": "docker buildx build --platform linux/arm64 -t pi-dashboard:latest .",
+    "pi:save": "docker save pi-dashboard:latest | gzip > pi-dashboard.tar.gz"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "sqlite3": "^5.1.6",
+    "axios": "^1.5.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "googleapis": "^126.0.1",
+    "helmet": "^7.0.0",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "raspberry-pi",
+    "dashboard",
+    "touch-screen",
+    "docker",
+    "nodejs"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
