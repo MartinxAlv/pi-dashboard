@@ -242,14 +242,17 @@
                         <div class="control-group">
                             <h3>Quick Actions</h3>
                             <div class="quick-actions">
-                                <button class="btn btn-large btn-accent" onclick="fullscreenDashboard()">
-                                    📺 Open Dashboard Fullscreen
+                                <button class="btn btn-large btn-accent" onclick="window.adminPanel.goToDashboard()">
+                                    🖥️ Open Dashboard
                                 </button>
                                 <button class="btn btn-large btn-secondary" onclick="refreshAll()">
                                     🔄 Refresh All Data
                                 </button>
                                 <button class="btn btn-large btn-warning" onclick="resetToDefaults()">
                                     ⚙️ Reset All Settings
+                                </button>
+                                <button class="btn btn-large btn-secondary" onclick="window.adminPanel.exitKioskMode()">
+                                    🚪 Exit/Close
                                 </button>
                             </div>
                         </div>
@@ -425,6 +428,9 @@
                 }
             });
             
+            // Add kiosk controls to admin page
+            setupAdminKioskControls();
+            
             // Add tab functionality
             document.querySelectorAll('.tab-button').forEach(button => {
                 button.addEventListener('click', () => {
@@ -453,6 +459,412 @@
             if (currentPageElement && pageNames[pageIndex]) {
                 currentPageElement.textContent = pageNames[pageIndex];
             }
+        }
+
+        // Admin Kiosk Controls
+        function setupAdminKioskControls() {
+            let touchStartX = 0;
+            let touchStartTime = 0;
+            let touchTimeout = null;
+            let isLongPress = false;
+            
+            // Keyboard shortcuts for admin
+            document.addEventListener('keydown', (e) => {
+                switch(e.key) {
+                    case 'F5':
+                    case 'r':
+                    case 'R':
+                        e.preventDefault();
+                        console.log('🔄 Refreshing admin panel...');
+                        window.location.reload();
+                        break;
+                        
+                    case 'Escape':
+                    case 'q':
+                    case 'Q':
+                        e.preventDefault();
+                        exitAdminKioskMode();
+                        break;
+                        
+                    case 'd':
+                    case 'D':
+                        e.preventDefault();
+                        window.location.href = '/';
+                        break;
+                        
+                    case 'h':
+                    case 'H':
+                    case '?':
+                        e.preventDefault();
+                        showAdminHelpOverlay();
+                        break;
+                        
+                    case 'f':
+                    case 'F':
+                        e.preventDefault();
+                        toggleAdminFullscreen();
+                        break;
+                }
+            });
+
+            // Touch controls for admin
+            document.addEventListener('touchstart', (e) => {
+                const touch = e.changedTouches[0];
+                showAdminTouchIndicator(touch.clientX, touch.clientY);
+                
+                touchStartX = touch.clientX;
+                touchStartTime = Date.now();
+                isLongPress = false;
+                
+                if (touchTimeout) {
+                    clearTimeout(touchTimeout);
+                }
+                
+                touchTimeout = setTimeout(() => {
+                    isLongPress = true;
+                    console.log('🔒 Admin long press detected (8 seconds)');
+                    showAdminQuickActions();
+                }, 8000);
+            });
+            
+            document.addEventListener('touchmove', (e) => {
+                if (touchTimeout) {
+                    clearTimeout(touchTimeout);
+                    touchTimeout = null;
+                }
+            });
+            
+            document.addEventListener('touchend', (e) => {
+                if (touchTimeout) {
+                    clearTimeout(touchTimeout);
+                    touchTimeout = null;
+                }
+            });
+
+            // Prevent context menu
+            document.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+            });
+        }
+
+        function showAdminQuickActions() {
+            const existingOverlay = document.getElementById('admin-quick-actions-overlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+                return;
+            }
+
+            const overlay = document.createElement('div');
+            overlay.id = 'admin-quick-actions-overlay';
+            overlay.innerHTML = `
+                <div class="admin-quick-actions-content">
+                    <h2>⚡ Admin Quick Actions</h2>
+                    <div class="admin-action-buttons">
+                        <button onclick="window.location.reload()" class="admin-action-btn">🔄 Refresh Admin</button>
+                        <button onclick="window.location.href = '/'" class="admin-action-btn dashboard-btn">🖥️ Go to Dashboard</button>
+                        <button onclick="showAdminHelpOverlay(); document.getElementById('admin-quick-actions-overlay').remove()" class="admin-action-btn">❓ Help</button>
+                        <button onclick="exitAdminKioskMode()" class="admin-action-btn">🚪 Exit Kiosk</button>
+                        <button onclick="toggleAdminFullscreen()" class="admin-action-btn">📺 Fullscreen</button>
+                        <button onclick="clearAdminCache()" class="admin-action-btn">🧹 Clear Cache</button>
+                        <button onclick="document.getElementById('admin-quick-actions-overlay').remove()" class="admin-action-btn close-btn">❌ Close</button>
+                    </div>
+                </div>
+            `;
+
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85);
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: 'Segoe UI', sans-serif;
+            `;
+
+            const content = overlay.querySelector('.admin-quick-actions-content');
+            content.style.cssText = `
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 15px;
+                padding: 25px;
+                color: #333;
+                text-align: center;
+                max-width: 600px;
+                width: 90%;
+                max-height: 400px;
+                overflow-y: auto;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            `;
+
+            const buttonContainer = overlay.querySelector('.admin-action-buttons');
+            buttonContainer.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+                margin-top: 20px;
+            `;
+
+            overlay.querySelectorAll('.admin-action-btn').forEach(btn => {
+                btn.style.cssText = `
+                    padding: 14px 10px;
+                    border: none;
+                    border-radius: 8px;
+                    background: var(--primary-color, #667eea);
+                    color: white;
+                    font-size: 0.95rem;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    min-height: 55px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    text-align: center;
+                    line-height: 1.2;
+                `;
+                
+                btn.addEventListener('mousedown', () => {
+                    btn.style.transform = 'scale(0.95)';
+                });
+                
+                btn.addEventListener('mouseup', () => {
+                    btn.style.transform = 'scale(1)';
+                });
+            });
+
+            // Special styling for dashboard button
+            const dashboardBtn = overlay.querySelector('.dashboard-btn');
+            if (dashboardBtn) {
+                dashboardBtn.style.background = '#4CAF50';
+            }
+
+            // Special styling for close button
+            const closeBtn = overlay.querySelector('.close-btn');
+            if (closeBtn) {
+                closeBtn.style.background = '#6c757d';
+            }
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+
+            document.body.appendChild(overlay);
+        }
+
+        function showAdminTouchIndicator(x, y) {
+            const indicator = document.createElement('div');
+            indicator.style.cssText = `
+                position: fixed;
+                left: ${x - 25}px;
+                top: ${y - 25}px;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                background: rgba(102, 126, 234, 0.5);
+                border: 2px solid var(--primary-color, #667eea);
+                z-index: 999998;
+                pointer-events: none;
+                animation: adminTouchPulse 0.6s ease-out forwards;
+            `;
+
+            if (!document.getElementById('admin-touch-indicator-style')) {
+                const style = document.createElement('style');
+                style.id = 'admin-touch-indicator-style';
+                style.textContent = `
+                    @keyframes adminTouchPulse {
+                        0% { transform: scale(0.5); opacity: 1; }
+                        100% { transform: scale(2); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            document.body.appendChild(indicator);
+            setTimeout(() => indicator.remove(), 600);
+        }
+
+        function exitAdminKioskMode() {
+            console.log('🚪 Attempting to exit admin kiosk mode...');
+            
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            
+            try {
+                window.close();
+            } catch (e) {
+                console.log('Cannot close window - not opened by script');
+            }
+            
+            showAdminNotification('Press Alt+F4 or Ctrl+W to close, or use window controls', 4000);
+        }
+
+        function toggleAdminFullscreen() {
+            if (!document.fullscreenElement) {
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                } else if (elem.mozRequestFullScreen) {
+                    elem.mozRequestFullScreen();
+                } else if (elem.msRequestFullscreen) {
+                    elem.msRequestFullscreen();
+                }
+                showAdminNotification('Entered fullscreen mode');
+            } else {
+                exitAdminKioskMode();
+            }
+        }
+
+        function clearAdminCache() {
+            console.log('🧹 Clearing admin cache...');
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                console.log('Could not clear storage:', e);
+            }
+            window.location.reload(true);
+        }
+
+        function showAdminHelpOverlay() {
+            const existingOverlay = document.getElementById('admin-help-overlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+                return;
+            }
+
+            const overlay = document.createElement('div');
+            overlay.id = 'admin-help-overlay';
+            overlay.innerHTML = `
+                <div class="admin-help-content">
+                    <h2>🎮 Admin Panel Controls</h2>
+                    
+                    <div class="admin-help-section">
+                        <h3>⌨️ Keyboard Shortcuts</h3>
+                        <div class="admin-help-grid">
+                            <span>R or F5</span><span>Refresh admin panel</span>
+                            <span>Q or Escape</span><span>Exit kiosk mode</span>
+                            <span>D</span><span>Open dashboard</span>
+                            <span>F</span><span>Toggle fullscreen</span>
+                            <span>H or ?</span><span>Show/hide this help</span>
+                        </div>
+                    </div>
+
+                    <div class="admin-help-section">
+                        <h3>👆 Touch Gestures</h3>
+                        <div class="admin-help-grid">
+                            <span>Long press (8s)</span><span>Quick actions menu</span>
+                        </div>
+                    </div>
+
+                    <div class="admin-help-footer">
+                        <p>Press H, ? or tap anywhere to close</p>
+                    </div>
+                </div>
+            `;
+
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.9);
+                color: white;
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: 'Segoe UI', sans-serif;
+            `;
+
+            const helpContent = overlay.querySelector('.admin-help-content');
+            helpContent.style.cssText = `
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border-radius: 20px;
+                padding: 30px;
+                max-width: 500px;
+                max-height: 80vh;
+                overflow-y: auto;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            `;
+
+            overlay.querySelectorAll('.admin-help-section').forEach(section => {
+                section.style.marginBottom = '25px';
+            });
+
+            overlay.querySelectorAll('h2').forEach(h => {
+                h.style.cssText = 'margin-bottom: 20px; text-align: center; font-size: 1.8rem;';
+            });
+
+            overlay.querySelectorAll('h3').forEach(h => {
+                h.style.cssText = 'margin-bottom: 15px; font-size: 1.2rem; color: #64b5f6;';
+            });
+
+            overlay.querySelectorAll('.admin-help-grid').forEach(grid => {
+                grid.style.cssText = `
+                    display: grid;
+                    grid-template-columns: 1fr 2fr;
+                    gap: 8px 15px;
+                    font-size: 0.9rem;
+                    line-height: 1.4;
+                `;
+            });
+
+            overlay.querySelectorAll('.admin-help-grid span:nth-child(odd)').forEach(span => {
+                span.style.cssText = 'font-weight: bold; color: #81c784;';
+            });
+
+            overlay.querySelector('.admin-help-footer').style.cssText = `
+                text-align: center;
+                margin-top: 20px;
+                font-size: 0.85rem;
+                opacity: 0.7;
+            `;
+
+            overlay.addEventListener('click', () => overlay.remove());
+            document.body.appendChild(overlay);
+        }
+
+        function showAdminNotification(message, duration = 2000) {
+            const existing = document.getElementById('admin-notification');
+            if (existing) existing.remove();
+
+            const notification = document.createElement('div');
+            notification.id = 'admin-notification';
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 50px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 12px 24px;
+                border-radius: 25px;
+                font-size: 0.9rem;
+                z-index: 999997;
+                transition: opacity 0.3s ease;
+                backdrop-filter: blur(10px);
+            `;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 300);
+            }, duration);
         }
     </script>
 </body>

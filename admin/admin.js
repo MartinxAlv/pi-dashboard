@@ -9,6 +9,7 @@ class AdminPanel {
     init() {
         this.setupSocket();
         this.setupEventListeners();
+        this.setupKioskControls(); // Add kiosk controls
         this.loadInitialData();
     }
 
@@ -50,20 +51,96 @@ class AdminPanel {
     setupEventListeners() {
         // Auto cycle toggle
         const autoCycleToggle = document.getElementById('auto-cycle');
-        autoCycleToggle.addEventListener('change', (e) => {
-            this.socket.emit('updateSettings', {
-                autoCycle: e.target.checked
+        if (autoCycleToggle) {
+            autoCycleToggle.addEventListener('change', (e) => {
+                this.socket.emit('updateSettings', {
+                    autoCycle: e.target.checked
+                });
             });
-        });
+        }
         
         // Cycle interval update
         const cycleInterval = document.getElementById('cycle-interval');
-        cycleInterval.addEventListener('change', (e) => {
-            const interval = parseInt(e.target.value) * 1000; // Convert to milliseconds
-            this.socket.emit('updateSettings', {
-                cycleInterval: interval
+        if (cycleInterval) {
+            cycleInterval.addEventListener('change', (e) => {
+                const interval = parseInt(e.target.value) * 1000; // Convert to milliseconds
+                this.socket.emit('updateSettings', {
+                    cycleInterval: interval
+                });
             });
+        }
+    }
+
+    setupKioskControls() {
+        // Remove keyboard shortcuts and touch controls
+        // Admin page uses UI buttons instead
+        console.log('🎮 Admin page using UI buttons for controls');
+        
+        // Only prevent context menu in kiosk scenarios
+        document.addEventListener('contextmenu', (e) => {
+            // Only prevent if not in a form field
+            if (!e.target.matches('input, textarea, select')) {
+                e.preventDefault();
+            }
         });
+    }
+
+    // Kiosk helper methods for UI buttons
+    exitKioskMode() {
+        console.log('🚪 Attempting to exit kiosk mode...');
+        
+        if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        
+        try {
+            window.close();
+        } catch (e) {
+            console.log('Cannot close window - not opened by script');
+        }
+        
+        this.showNotification('Press Alt+F4 or Ctrl+W to close, or use window controls', 4000);
+    }
+
+    goToDashboard() {
+        console.log('🖥️ Redirecting to dashboard...');
+        window.location.href = '/';
+    }
+
+    showNotification(message, duration = 2000) {
+        const existing = document.getElementById('admin-notification');
+        if (existing) existing.remove();
+
+        const notification = document.createElement('div');
+        notification.id = 'admin-notification';
+        notification.textContent = message;
+        notification.style.cssText = `
+            position: fixed;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            z-index: 999997;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(10px);
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 300);
+        }, duration);
     }
 
     async loadInitialData() {
@@ -109,36 +186,44 @@ class AdminPanel {
         
         // Update auto cycle toggle
         const autoCycleToggle = document.getElementById('auto-cycle');
-        autoCycleToggle.checked = state.autoCycle;
+        if (autoCycleToggle) {
+            autoCycleToggle.checked = state.autoCycle;
+        }
         
         // Update cycle interval
         const cycleInterval = document.getElementById('cycle-interval');
-        cycleInterval.value = Math.floor(state.cycleInterval / 1000);
+        if (cycleInterval) {
+            cycleInterval.value = Math.floor(state.cycleInterval / 1000);
+        }
         
         // Update current page info
         this.updateCurrentPageDisplay(state.currentPage);
         
         // Update last updated time
         const lastUpdated = document.getElementById('last-updated');
-        if (state.lastUpdated) {
+        if (lastUpdated && state.lastUpdated) {
             const date = new Date(state.lastUpdated);
             lastUpdated.textContent = date.toLocaleTimeString();
         }
         
         // Update weather city if available - ALWAYS update this field
         const weatherCity = document.getElementById('weather-city');
-        if (state.settings && state.settings.city) {
-            console.log('Setting city field to:', state.settings.city);
-            weatherCity.value = state.settings.city;
-        } else {
-            console.log('No city in state, setting default');
-            weatherCity.value = 'Dallas,US';
+        if (weatherCity) {
+            if (state.settings && state.settings.city) {
+                console.log('Setting city field to:', state.settings.city);
+                weatherCity.value = state.settings.city;
+            } else {
+                console.log('No city in state, setting default');
+                weatherCity.value = 'Dallas,US';
+            }
         }
         
         // Update weather units if available
         if (state.settings && state.settings.units) {
             const weatherUnits = document.getElementById('weather-units');
-            weatherUnits.value = state.settings.units;
+            if (weatherUnits) {
+                weatherUnits.value = state.settings.units;
+            }
         }
         
         // Update API key status
@@ -149,12 +234,14 @@ class AdminPanel {
         const statusElement = document.getElementById('api-key-indicator');
         const statusContainer = document.getElementById('api-key-status');
         
-        if (hasApiKey) {
-            statusElement.textContent = 'API key saved (•••••••••••••••)';
-            statusContainer.className = 'api-status has-key';
-        } else {
-            statusElement.textContent = 'No API key saved';
-            statusContainer.className = 'api-status no-key';
+        if (statusElement && statusContainer) {
+            if (hasApiKey) {
+                statusElement.textContent = 'API key saved (•••••••••••••••)';
+                statusContainer.className = 'api-status has-key';
+            } else {
+                statusElement.textContent = 'No API key saved';
+                statusContainer.className = 'api-status no-key';
+            }
         }
     }
 
@@ -255,12 +342,14 @@ function toggleApiKeyVisibility() {
     const apiKeyInput = document.getElementById('weather-api-key');
     const toggleButton = apiKeyInput.nextElementSibling;
     
-    if (apiKeyInput.type === 'password') {
-        apiKeyInput.type = 'text';
-        toggleButton.textContent = '🙈';
-    } else {
-        apiKeyInput.type = 'password';
-        toggleButton.textContent = '👁️';
+    if (apiKeyInput && toggleButton) {
+        if (apiKeyInput.type === 'password') {
+            apiKeyInput.type = 'text';
+            toggleButton.textContent = '🙈';
+        } else {
+            apiKeyInput.type = 'password';
+            toggleButton.textContent = '👁️';
+        }
     }
 }
 
@@ -307,16 +396,20 @@ async function updateApiKey() {
 
 async function testWeather() {
     const statusElement = document.getElementById('weather-api-status');
-    statusElement.textContent = 'Testing...';
-    statusElement.style.color = '#ff9800';
+    if (statusElement) {
+        statusElement.textContent = 'Testing...';
+        statusElement.style.color = '#ff9800';
+    }
     
     try {
         const response = await fetch('/api/weather?test=true');
         
         if (response.ok) {
             const weatherData = await response.json();
-            statusElement.textContent = 'Working ✓';
-            statusElement.style.color = '#4CAF50';
+            if (statusElement) {
+                statusElement.textContent = 'Working ✓';
+                statusElement.style.color = '#4CAF50';
+            }
             
             alert(`Weather test successful!\n` +
                   `Location: ${weatherData.current.city}, ${weatherData.current.country}\n` +
@@ -324,8 +417,10 @@ async function testWeather() {
                   `Condition: ${weatherData.current.description}`);
         } else {
             const errorData = await response.json();
-            statusElement.textContent = 'Error ✗';
-            statusElement.style.color = '#f44336';
+            if (statusElement) {
+                statusElement.textContent = 'Error ✗';
+                statusElement.style.color = '#f44336';
+            }
             
             if (errorData.error.includes('API key')) {
                 alert('API Key Error: Please check that your OpenWeatherMap API key is correct and active. ' +
@@ -338,8 +433,10 @@ async function testWeather() {
         }
     } catch (error) {
         console.error('Error testing weather:', error);
-        statusElement.textContent = 'Connection Error';
-        statusElement.style.color = '#f44336';
+        if (statusElement) {
+            statusElement.textContent = 'Connection Error';
+            statusElement.style.color = '#f44336';
+        }
         alert('Error connecting to weather service');
     }
 }
@@ -408,7 +505,9 @@ async function refreshWeather() {
         const response = await fetch('/api/weather');
         if (response.ok) {
             alert('Weather data refreshed!');
-            window.adminPanel.checkWeatherAPI();
+            if (window.adminPanel) {
+                window.adminPanel.checkWeatherAPI();
+            }
         } else {
             alert('Failed to refresh weather data');
         }
@@ -472,7 +571,8 @@ async function resetToDefaults() {
 }
 
 function fullscreenDashboard() {
-    window.open('/', '_blank');
+    // Redirect to dashboard instead of opening new window
+    window.location.href = '/';
 }
 
 // Initialize admin panel when page loads
