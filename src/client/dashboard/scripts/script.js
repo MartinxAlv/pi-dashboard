@@ -10,6 +10,13 @@ class Dashboard {
         this.calendarUpdateInterval = null;
         this.hueUpdateInterval = null;
         this.statusEl = null; // Track the status element
+        this.panels = { datetime: true, calendar: true, hue: true }; // Panel visibility
+        this.activePanels = []; // Array of active panel indices
+        this.calendarScrollInterval = null; // Calendar auto-scroll
+        this.touchPauseTimeout = null; // Touch pause timer
+        this.isPaused = false; // Touch pause state
+        this.countdownInterval = null; // Touch pause countdown
+        this.touchPauseClickHandler = null; // Touch pause click handler
         
         this.init();
     }
@@ -21,9 +28,11 @@ class Dashboard {
         this.loadWeather();
         this.loadCalendar();
         this.loadHue();
+        this.initializePanels(); // Initialize panel visibility
         this.startAutoCycle();
         this.loadTheme(); // Load saved theme
         this.updateCycleButton(); // Initialize pause button state
+        this.setupTouchPause(); // Setup touch-to-pause functionality
         
         // Update weather every 30 minutes (instead of 10)
         this.weatherUpdateInterval = setInterval(() => {
@@ -112,6 +121,10 @@ class Dashboard {
         // Listen for theme updates from admin
         this.socket.on('themeUpdated', (theme) => {
             this.applyTheme(theme);
+        });
+        
+        this.socket.on('panelsChanged', (panels) => {
+            this.updatePanelVisibility(panels);
         });
         
         // Set initial connecting state
@@ -542,45 +555,361 @@ class Dashboard {
                 return '📋';
             };
             
+            // Handle title that might be an object or string
+            const eventTitle = typeof event.title === 'object' ? 
+                (event.title.val || event.title.value || 'Untitled Event') : 
+                event.title;
+
             return `
                 <div class="event-item">
-                    <div class="event-icon">${getEventIcon(event.title, event.isAllDay)}</div>
+                    <div class="event-icon">${getEventIcon(eventTitle, event.isAllDay)}</div>
                     <div class="event-details">
-                        <div class="event-title">${event.title}</div>
-                        <div class="event-time">${timeStr}</div>
+                        <div class="event-title">${eventTitle}</div>
+                        <div class="event-time">${event.isAllDay ? 'All Day' : timeStr}</div>
                         <div class="event-date">${dateStr}</div>
+                        ${event.source ? `<div class="event-source">📍 ${event.source}</div>` : ''}
                     </div>
                 </div>
             `;
         }).join('');
         
         eventsContainer.innerHTML = eventsHtml;
+        
+        // Start auto-scroll for calendar events if we have multiple events
+        this.startCalendarAutoScroll();
     }
 
-    goToPage(pageIndex) {
+    startCalendarAutoScroll() {
+        // Clear any existing scroll interval
+        if (this.calendarScrollInterval) {
+            clearInterval(this.calendarScrollInterval);
+        }
+
+        const eventsContainer = document.getElementById('events-list');
+        if (!eventsContainer || eventsContainer.children.length <= 3) {
+            return; // Don't scroll if we have 3 or fewer events (all visible)
+        }
+
+        // Auto-scroll every 3 seconds when calendar page is active
+        this.calendarScrollInterval = setInterval(() => {
+            if (this.currentPage === 1 && !this.isPaused) { // Calendar is page 1
+                const scrollHeight = eventsContainer.scrollHeight;
+                const clientHeight = eventsContainer.clientHeight;
+                const currentScroll = eventsContainer.scrollTop;
+                
+                // Scroll down by one event height (approximately)
+                const eventHeight = 80; // Approximate height of one event
+                const newScroll = currentScroll + eventHeight;
+                
+                if (newScroll >= scrollHeight - clientHeight) {
+                    // We've reached the bottom, scroll back to top
+                    eventsContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    // Scroll down
+                    eventsContainer.scrollTo({ top: newScroll, behavior: 'smooth' });
+                }
+            }
+        }, 3000); // Scroll every 3 seconds
+    }
+
+    setupTouchPause() {
+        // Add touch/click listeners to pause auto-cycling
+        document.addEventListener('touchstart', (e) => this.pauseForTouch(e));
+        document.addEventListener('click', (e) => this.pauseForTouch(e));
+        
+        // Also listen for mouse interaction
+        document.addEventListener('mousedown', (e) => this.pauseForTouch(e));
+    }
+
+    pauseForTouch(event) {
+        // Don't trigger touch pause if clicking on control buttons or if already paused
+        if (this.isPaused) return;
+        
+        const target = event?.target;
+        if (target && (
+            target.closest('.control-btn') || 
+            target.closest('.indicator') ||
+            target.closest('#pause-indicator')
+        )) {
+            return; // Ignore clicks on control buttons
+        }
+        
+        console.log('👆 Touch detected - pausing for 1 minute');
+        
+        // Set pause state
+        this.isPaused = true;
+        
+        // Stop auto-cycling
+        if (this.cycleTimer) {
+            clearTimeout(this.cycleTimer);
+            this.cycleTimer = null;
+        }
+        
+        // Stop calendar scrolling
+        if (this.calendarScrollInterval) {
+            clearInterval(this.calendarScrollInterval);
+        }
+        
+        // Clear any existing pause timeout
+        if (this.touchPauseTimeout) {
+            clearTimeout(this.touchPauseTimeout);
+        }
+        
+        // Show pause indicator
+        this.showPauseIndicator();
+        
+        // Resume after 1 minute
+        this.touchPauseTimeout = setTimeout(() => {
+            console.log('⏰ Resuming auto-cycle after 1 minute');
+            this.isPaused = false;
+            this.hidePauseIndicator();
+            
+            // Resume auto-cycling if it was enabled
+            if (this.autoCycle) {
+                this.startAutoCycle();
+            }
+            
+            // Resume calendar scrolling
+            this.startCalendarAutoScroll();
+        }, 60000); // 1 minute
+    }
+
+    showPauseIndicator() {
+        const cycleControl = document.getElementById('cycle-control');
+        const cycleIcon = document.getElementById('cycle-icon');
+        
+        if (cycleControl && cycleIcon) {
+            // Temporarily disable auto-cycle and show pause state
+            this.autoCycle = false;
+            this.updateCycleButton();
+            
+            // Add countdown to the existing button
+            let seconds = 60;
+            
+            // Create countdown display
+            const updateCountdown = () => {
+                cycleIcon.textContent = `⏸️`;
+                cycleControl.title = `Touch Paused - Click to resume or wait ${seconds}s`;
+                cycleControl.classList.add('touch-paused');
+            };
+            
+            updateCountdown();
+            
+            // Add click handler to allow manual unpause
+            const handleTouchPauseClick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('👆 Touch pause cancelled by user click');
+                this.cancelTouchPause();
+            };
+            
+            // Store the handler so we can remove it later
+            this.touchPauseClickHandler = handleTouchPauseClick;
+            cycleControl.addEventListener('click', handleTouchPauseClick);
+            
+            // Start countdown
+            this.countdownInterval = setInterval(() => {
+                seconds--;
+                updateCountdown();
+                
+                if (seconds <= 0) {
+                    clearInterval(this.countdownInterval);
+                }
+            }, 1000);
+        }
+    }
+
+    cancelTouchPause() {
+        // Clear the touch pause timeout
+        if (this.touchPauseTimeout) {
+            clearTimeout(this.touchPauseTimeout);
+            this.touchPauseTimeout = null;
+        }
+        
+        // Resume immediately
+        this.isPaused = false;
+        this.hidePauseIndicator();
+        
+        // Resume auto-cycling and calendar scrolling
+        if (this.autoCycle) {
+            this.startAutoCycle();
+        }
+        this.startCalendarAutoScroll();
+    }
+
+    hidePauseIndicator() {
+        const cycleControl = document.getElementById('cycle-control');
+        
+        if (cycleControl) {
+            // Re-enable auto-cycle and restore normal appearance
+            this.autoCycle = true;
+            this.updateCycleButton();
+            cycleControl.classList.remove('touch-paused');
+            
+            // Remove touch pause click handler
+            if (this.touchPauseClickHandler) {
+                cycleControl.removeEventListener('click', this.touchPauseClickHandler);
+                this.touchPauseClickHandler = null;
+            }
+            
+            // Clear countdown
+            if (this.countdownInterval) {
+                clearInterval(this.countdownInterval);
+            }
+        }
+    }
+
+    // ===== PANEL MANAGEMENT =====
+    async initializePanels() {
+        try {
+            const response = await fetch('/api/dashboard/state');
+            if (response.ok) {
+                const state = await response.json();
+                if (state.settings && state.settings.panels) {
+                    this.updatePanelVisibility(state.settings.panels);
+                } else {
+                    // Default: all panels enabled
+                    this.updatePanelVisibility({ datetime: true, calendar: true, hue: true });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading panel settings:', error);
+            // Default: all panels enabled
+            this.updatePanelVisibility({ datetime: true, calendar: true, hue: true });
+        }
+    }
+
+    updatePanelVisibility(panels) {
+        console.log('📋 Updating panel visibility:', panels);
+        this.panels = panels;
+        
+        // Get all panel elements
+        const datetimePage = document.getElementById('page-0');
+        const calendarPage = document.getElementById('page-1');
+        const huePage = document.getElementById('page-2');
+        
+        // Show/hide panels
+        datetimePage.style.display = panels.datetime ? 'flex' : 'none';
+        calendarPage.style.display = panels.calendar ? 'flex' : 'none';
+        huePage.style.display = panels.hue ? 'flex' : 'none';
+        
+        // Build active panels list
+        this.activePanels = [];
+        if (panels.datetime) this.activePanels.push(0);
+        if (panels.calendar) this.activePanels.push(1);
+        if (panels.hue) this.activePanels.push(2);
+        
+        // Update total pages and indicators
+        this.totalPages = this.activePanels.length;
+        this.updatePageIndicators();
+        
+        // Ensure current page is valid
+        if (this.currentPage >= this.activePanels.length) {
+            this.currentPage = 0;
+        }
+        
+        // Go to the first active page
+        if (this.activePanels.length > 0) {
+            this.goToPage(0, true); // true = use active panel index
+        }
+        
+        console.log('📋 Active panels:', this.activePanels, 'Total pages:', this.totalPages);
+    }
+
+    updatePageIndicators() {
+        const indicatorsContainer = document.querySelector('.page-indicators');
+        if (!indicatorsContainer) return;
+        
+        // Clear existing indicators
+        indicatorsContainer.innerHTML = '';
+        
+        // Create indicators for active panels only
+        this.activePanels.forEach((panelIndex, index) => {
+            const indicator = document.createElement('div');
+            indicator.className = `indicator ${index === this.currentPage ? 'active' : ''}`;
+            indicator.setAttribute('data-page', index.toString());
+            indicator.addEventListener('click', () => {
+                this.goToPage(index, true); // true = use active panel index
+            });
+            indicatorsContainer.appendChild(indicator);
+        });
+    }
+
+    goToPage(pageIndex, useActivePanels = false) {
         if (pageIndex < 0 || pageIndex >= this.totalPages) return;
         
-        const currentPageEl = document.getElementById(`page-${this.currentPage}`);
-        const newPageEl = document.getElementById(`page-${pageIndex}`);
+        // Convert active panel index to actual page index if needed
+        const actualCurrentPage = useActivePanels && this.activePanels.length > 0 ? this.activePanels[this.currentPage] : this.currentPage;
+        const actualNewPage = useActivePanels && this.activePanels.length > 0 ? this.activePanels[pageIndex] : pageIndex;
+        
+        if (actualNewPage === undefined) return;
+        
+        const currentPageEl = document.getElementById(`page-${actualCurrentPage}`);
+        const newPageEl = document.getElementById(`page-${actualNewPage}`);
         const currentIndicator = document.querySelector(`.indicator[data-page="${this.currentPage}"]`);
         const newIndicator = document.querySelector(`.indicator[data-page="${pageIndex}"]`);
         
-        // Update classes
-        currentPageEl.classList.remove('active');
-        currentPageEl.classList.add('prev');
+        if (!currentPageEl || !newPageEl) return;
         
-        newPageEl.classList.remove('prev');
+        // Determine direction (forward = right-to-left slide, backward = left-to-right slide)
+        const isForward = pageIndex > this.currentPage;
+        
+        // Clear any existing transition classes
+        const allPages = document.querySelectorAll('.page');
+        allPages.forEach(page => {
+            page.classList.remove('slide-out-left', 'slide-out-right', 'slide-in-left', 'slide-in-right', 'prev');
+        });
+        
+        // Set up new page initial position
+        if (isForward) {
+            // Moving forward: new page starts from right
+            newPageEl.classList.add('slide-in-right');
+        } else {
+            // Moving backward: new page starts from left  
+            newPageEl.classList.add('slide-in-left');
+        }
+        
+        // Force a reflow to ensure the initial position is set
+        newPageEl.offsetHeight;
+        
+        // Start the transition
+        currentPageEl.classList.remove('active');
+        
+        if (isForward) {
+            // Moving forward: current page slides out left
+            currentPageEl.classList.add('slide-out-left');
+        } else {
+            // Moving backward: current page slides out right
+            currentPageEl.classList.add('slide-out-right');
+        }
+        
+        // Bring in the new page
+        newPageEl.classList.remove('slide-in-left', 'slide-in-right');
         newPageEl.classList.add('active');
         
-        currentIndicator.classList.remove('active');
-        newIndicator.classList.add('active');
+        // Update indicators
+        if (currentIndicator) currentIndicator.classList.remove('active');
+        if (newIndicator) newIndicator.classList.add('active');
         
         // Clean up after transition
         setTimeout(() => {
-            currentPageEl.classList.remove('prev');
-        }, 500);
+            allPages.forEach(page => {
+                page.classList.remove('slide-out-left', 'slide-out-right', 'slide-in-left', 'slide-in-right', 'prev');
+            });
+        }, 450); // Slightly less than CSS transition time
         
         this.currentPage = pageIndex;
+        
+        // Handle calendar auto-scroll when switching pages
+        const actualPage = useActivePanels && this.activePanels.length > 0 ? this.activePanels[pageIndex] : pageIndex;
+        if (actualPage === 1) { // Calendar page
+            this.startCalendarAutoScroll();
+        } else {
+            // Stop calendar scrolling when not on calendar page
+            if (this.calendarScrollInterval) {
+                clearInterval(this.calendarScrollInterval);
+            }
+        }
         
         // Notify admin panel of page change (for live preview)
         try {
@@ -594,20 +923,20 @@ class Dashboard {
             // Ignore errors if not in iframe
         }
         
-        // Restart auto cycle
-        if (this.autoCycle) {
+        // Restart auto cycle (only if not paused)
+        if (this.autoCycle && !this.isPaused) {
             this.startAutoCycle();
         }
     }
 
     nextPage() {
         const nextPage = (this.currentPage + 1) % this.totalPages;
-        this.goToPage(nextPage);
+        this.goToPage(nextPage, true); // Use active panels
     }
 
     previousPage() {
         const prevPage = (this.currentPage - 1 + this.totalPages) % this.totalPages;
-        this.goToPage(prevPage);
+        this.goToPage(prevPage, true); // Use active panels
     }
 
     startAutoCycle() {

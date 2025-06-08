@@ -22,7 +22,8 @@ router.get('/', async (req, res) => {
         const weatherData = await weatherService.getCurrentWeatherAndForecast(apiKey, city, units);
         
         dashboardState.weather = weatherData;
-        dashboardState.lastUpdated = new Date();
+        dashboardState.weatherLastUpdated = new Date();
+        dashboardState.lastUpdated = new Date(); // Keep for compatibility
         
         res.json(weatherData);
     } catch (error) {
@@ -55,12 +56,6 @@ router.get('/', async (req, res) => {
         
         res.status(500).json({ error: errorMessage });
     }
-});
-
-// API Usage status endpoint
-router.get('/usage', (req, res) => {
-    const usageStats = weatherService.getUsageStats();
-    res.json(usageStats);
 });
 
 module.exports = router;

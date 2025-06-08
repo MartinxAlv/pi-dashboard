@@ -35,28 +35,6 @@ class WeatherService {
         this.apiCallTracker.calls.push(new Date());
     }
 
-    getUsageStats() {
-        const now = new Date();
-        const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
-        
-        this.apiCallTracker.calls = this.apiCallTracker.calls.filter(callTime => callTime > oneDayAgo);
-        const callsToday = this.apiCallTracker.calls.length;
-        const callsLastMinute = this.apiCallTracker.calls.filter(callTime => callTime > oneMinuteAgo).length;
-        
-        return {
-            callsToday,
-            maxCallsPerDay: this.apiCallTracker.maxCallsPerDay,
-            remaining: this.apiCallTracker.maxCallsPerDay - callsToday,
-            percentUsed: Math.round((callsToday / this.apiCallTracker.maxCallsPerDay) * 100),
-            callsLastMinute,
-            maxCallsPerMinute: this.apiCallTracker.maxCallsPerMinute,
-            resetTime: this.apiCallTracker.calls.length > 0 ? 
-                new Date(Math.min(...this.apiCallTracker.calls).getTime() + 24 * 60 * 60 * 1000) : null,
-            status: callsToday >= this.apiCallTracker.maxCallsPerDay ? 'limit_reached' : 
-                    callsToday >= this.apiCallTracker.maxCallsPerDay * 0.8 ? 'warning' : 'ok'
-        };
-    }
 
     async getCurrentWeatherAndForecast(apiKey, city, units) {
         console.log(`🌤️  Making weather API calls for "${city}"`);

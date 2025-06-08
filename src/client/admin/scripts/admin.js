@@ -11,6 +11,7 @@ class AdminPanel {
         this.setupEventListeners();
         this.setupKioskControls(); // Add kiosk controls
         this.loadInitialData();
+        this.startCalendarRefreshTimer(); // Start timer for calendar refresh countdown
     }
 
     setupSocket() {
@@ -186,45 +187,125 @@ class AdminPanel {
 
     async checkCalendarAPI() {
         try {
-            const response = await fetch('/api/calendar/test');
             const statusElement = document.getElementById('system-calendar-status');
             
-            if (response.ok) {
-                const calendarData = await response.json();
-                statusElement.textContent = '✓ Configured';
-                statusElement.style.color = '#4CAF50';
+            // Get current dashboard state to check calendar sources
+            const stateResponse = await fetch('/api/dashboard/state');
+            if (stateResponse.ok) {
+                const state = await stateResponse.json();
+                const calendarSources = state.settings?.calendarSources || [];
+                const enabledSources = calendarSources.filter(s => s.enabled);
+                
+                if (calendarSources.length === 0) {
+                    statusElement.textContent = 'Not configured';
+                    statusElement.style.color = '#ff9800';
+                } else if (enabledSources.length === 0) {
+                    statusElement.textContent = 'All disabled';
+                    statusElement.style.color = '#ff9800';
+                } else {
+                    // Test the main calendar endpoint to see if it's working
+                    const calendarResponse = await fetch('/api/calendar');
+                    if (calendarResponse.ok) {
+                        statusElement.textContent = `✓ ${enabledSources.length} source(s)`;
+                        statusElement.style.color = '#4CAF50';
+                    } else {
+                        statusElement.textContent = 'Error ✗';
+                        statusElement.style.color = '#f44336';
+                    }
+                }
+                
+                // Update calendar refresh information
+                this.updateCalendarRefreshInfo(state);
             } else {
-                const errorData = await response.json();
-                statusElement.textContent = 'Error ✗';
+                statusElement.textContent = 'Connection Error';
                 statusElement.style.color = '#f44336';
             }
         } catch (error) {
             const statusElement = document.getElementById('system-calendar-status');
-            
-            // Check if we have API key and calendar ID configured
-            const stateResponse = await fetch('/api/dashboard/state').catch(() => null);
-            if (stateResponse && stateResponse.ok) {
-                const state = await stateResponse.json();
-                const hasApiKey = state.settings?.googleCalendarApiKey;
-                const hasCalendarId = state.settings?.calendarId;
+            statusElement.textContent = 'Error ✗';
+            statusElement.style.color = '#f44336';
+            console.error('Error checking calendar API status:', error);
+        }
+    }
+
+    updateCalendarRefreshInfo(state) {
+        const refreshInfoEl = document.getElementById('calendar-refresh-info');
+        const calendarLastUpdateEl = document.getElementById('calendar-last-update');
+        const weatherLastUpdateEl = document.getElementById('weather-last-update');
+        const nextUpdateEl = document.getElementById('calendar-next-update');
+        
+        if (refreshInfoEl) {
+            refreshInfoEl.textContent = 'Every 5 minutes';
+        }
+        
+        // Update calendar last update
+        if (calendarLastUpdateEl) {
+            if (state.calendarLastUpdated) {
+                const lastUpdate = new Date(state.calendarLastUpdated);
+                calendarLastUpdateEl.textContent = lastUpdate.toLocaleTimeString();
+            } else {
+                calendarLastUpdateEl.textContent = 'Never';
+            }
+        }
+        
+        // Update weather last update
+        if (weatherLastUpdateEl) {
+            if (state.weatherLastUpdated) {
+                const lastUpdate = new Date(state.weatherLastUpdated);
+                weatherLastUpdateEl.textContent = lastUpdate.toLocaleTimeString();
+            } else {
+                weatherLastUpdateEl.textContent = 'Never';
+            }
+        }
+        
+        // Update calendar next update countdown
+        if (nextUpdateEl) {
+            if (state.calendarLastUpdated) {
+                const lastUpdate = new Date(state.calendarLastUpdated);
+                const nextUpdate = new Date(lastUpdate.getTime() + 5 * 60 * 1000); // Add 5 minutes
+                const now = new Date();
                 
-                if (!hasApiKey && !hasCalendarId) {
-                    statusElement.textContent = 'Not configured';
-                    statusElement.style.color = '#ff9800';
-                } else if (!hasApiKey) {
-                    statusElement.textContent = 'No API key';
-                    statusElement.style.color = '#ff9800';
-                } else if (!hasCalendarId) {
-                    statusElement.textContent = 'No Calendar ID';
-                    statusElement.style.color = '#ff9800';
+                if (nextUpdate > now) {
+                    const timeUntilNext = Math.ceil((nextUpdate - now) / 1000 / 60);
+                    nextUpdateEl.textContent = `In ${timeUntilNext} minute${timeUntilNext !== 1 ? 's' : ''}`;
                 } else {
-                    statusElement.textContent = 'Connection Error';
-                    statusElement.style.color = '#f44336';
+                    nextUpdateEl.textContent = 'Due now';
                 }
             } else {
-                statusElement.textContent = 'Not configured';
-                statusElement.style.color = '#ff9800';
+                nextUpdateEl.textContent = 'When dashboard loads';
             }
+        }
+    }
+
+    startCalendarRefreshTimer() {
+        // Update calendar refresh countdown every 30 seconds
+        setInterval(() => {
+            this.updateCalendarRefreshCountdown();
+        }, 30000);
+    }
+
+    async updateCalendarRefreshCountdown() {
+        try {
+            const stateResponse = await fetch('/api/dashboard/state');
+            if (stateResponse.ok) {
+                const state = await stateResponse.json();
+                const nextUpdateEl = document.getElementById('calendar-next-update');
+                
+                if (nextUpdateEl && state.calendarLastUpdated) {
+                    const lastUpdate = new Date(state.calendarLastUpdated);
+                    const nextUpdate = new Date(lastUpdate.getTime() + 5 * 60 * 1000); // Add 5 minutes
+                    const now = new Date();
+                    
+                    if (nextUpdate > now) {
+                        const timeUntilNext = Math.ceil((nextUpdate - now) / 1000 / 60);
+                        nextUpdateEl.textContent = `In ${timeUntilNext} minute${timeUntilNext !== 1 ? 's' : ''}`;
+                    } else {
+                        nextUpdateEl.textContent = 'Due now';
+                    }
+                }
+            }
+        } catch (error) {
+            // Silently fail - don't spam console with errors
         }
     }
 
@@ -294,12 +375,9 @@ class AdminPanel {
             }
         }
         
-        // Update calendar settings if available
-        if (state.settings && state.settings.calendarId) {
-            const calendarId = document.getElementById('calendar-id');
-            if (calendarId) {
-                calendarId.value = state.settings.calendarId;
-            }
+        // Update calendar sources list
+        if (state.settings && state.settings.calendarSources) {
+            updateCalendarSourcesList(state.settings.calendarSources);
         }
         
         if (state.settings && state.settings.maxCalendarEvents) {
@@ -309,14 +387,16 @@ class AdminPanel {
             }
         }
         
-        // Update calendar API key status
-        this.updateCalendarApiKeyStatus(state.settings && state.settings.googleCalendarApiKey);
-        
-        // Update calendar ID status
-        this.updateCalendarIdStatus(state.settings && state.settings.calendarId);
-        
         // Update API key status
         this.updateApiKeyStatus(state.settings && state.settings.weatherApiKey);
+        
+        // Update panel settings if available
+        if (state.settings && state.settings.panels) {
+            this.updatePanelToggles(state.settings.panels);
+        }
+        
+        // Update calendar refresh information
+        this.updateCalendarRefreshInfo(state);
     }
 
     updateCalendarApiKeyStatus(hasApiKey) {
@@ -364,10 +444,21 @@ class AdminPanel {
         }
     }
 
+    updatePanelToggles(panels) {
+        const datetimeToggle = document.getElementById('panel-datetime');
+        const calendarToggle = document.getElementById('panel-calendar');
+        const hueToggle = document.getElementById('panel-hue');
+        
+        if (datetimeToggle) datetimeToggle.checked = panels.datetime !== false;
+        if (calendarToggle) calendarToggle.checked = panels.calendar !== false;
+        if (hueToggle) hueToggle.checked = panels.hue !== false;
+    }
+
     updateCurrentPageDisplay(pageIndex) {
         const pageNames = [
             'Page 1: Date & Weather',
-            'Page 2: Calendar & Events'
+            'Page 2: Calendar & Events',
+            'Page 3: Philips Hue'
         ];
         
         const currentPageElement = document.getElementById('current-page');
@@ -399,41 +490,6 @@ function updateCycleInterval() {
     }
 }
 
-async function checkApiUsage() {
-    try {
-        const response = await fetch('/api/usage');
-        if (response.ok) {
-            const usage = await response.json();
-            const resetTime = usage.resetTime ? new Date(usage.resetTime).toLocaleString() : 'Unknown';
-            
-            let statusMessage = '';
-            if (usage.status === 'limit_reached') {
-                statusMessage = '⚠️ LIMIT REACHED';
-            } else if (usage.status === 'warning') {
-                statusMessage = '⚠️ HIGH USAGE';
-            } else {
-                statusMessage = '✅ OK';
-            }
-            
-            alert(`API Usage Status: ${statusMessage}\n\n` +
-                  `📊 Daily Usage:\n` +
-                  `Calls today: ${usage.callsToday}/${usage.maxCallsPerDay} (${usage.percentUsed}%)\n` +
-                  `Remaining: ${usage.remaining} calls\n` +
-                  `Resets at: ${resetTime}\n\n` +
-                  `⚡ Per-Minute Usage:\n` +
-                  `Calls last minute: ${usage.callsLastMinute}/${usage.maxCallsPerMinute}\n\n` +
-                  `💡 Official OpenWeatherMap limits:\n` +
-                  `• 1,000 calls per day (FREE)\n` +
-                  `• 60 calls per minute\n` +
-                  `• Weather updates every 30 minutes to conserve calls`);
-        } else {
-            alert('Failed to fetch API usage information');
-        }
-    } catch (error) {
-        console.error('Error checking API usage:', error);
-        alert('Error checking API usage');
-    }
-}
 
 async function showCurrentApiKey() {
     try {
@@ -1238,10 +1294,294 @@ async function applyHueScene(scene) {
     }
 }
 
-// Initialize admin panel when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    window.adminPanel = new AdminPanel();
-});
+// ===== PANEL MANAGEMENT FUNCTIONS =====
+async function savePanelSettings() {
+    const datetime = document.getElementById('panel-datetime').checked;
+    const calendar = document.getElementById('panel-calendar').checked;
+    const hue = document.getElementById('panel-hue').checked;
+    
+    // Ensure at least one panel is enabled
+    if (!datetime && !calendar && !hue) {
+        alert('⚠️ At least one panel must be enabled!');
+        // Re-enable the datetime panel as default
+        document.getElementById('panel-datetime').checked = true;
+        return;
+    }
+    
+    const panels = { datetime, calendar, hue };
+    
+    try {
+        const response = await fetch('/api/dashboard/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ panels })
+        });
+        
+        if (response.ok) {
+            alert('✅ Panel settings saved! Dashboard will update automatically.');
+            
+            // Notify dashboard to update panels
+            if (window.adminPanel && window.adminPanel.socket) {
+                window.adminPanel.socket.emit('panelsChanged', panels);
+            }
+        } else {
+            const error = await response.json();
+            alert(`❌ Failed to save panel settings: ${error.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error saving panel settings:', error);
+        alert('❌ Error saving panel settings');
+    }
+}
+
+async function resetPanelSettings() {
+    if (confirm('Reset all panels to enabled?\n\nThis will show all dashboard panels.')) {
+        document.getElementById('panel-datetime').checked = true;
+        document.getElementById('panel-calendar').checked = true;
+        document.getElementById('panel-hue').checked = true;
+        
+        await savePanelSettings();
+    }
+}
+
+function updateCalendarSourcesList(sources) {
+    const container = document.getElementById('calendar-sources-list');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    if (sources.length === 0) {
+        container.innerHTML = '<p class="no-sources">No calendar sources configured. Add one below to get started!</p>';
+        return;
+    }
+    
+    sources.forEach(source => {
+        const sourceDiv = document.createElement('div');
+        sourceDiv.className = 'calendar-source-item';
+        sourceDiv.innerHTML = `
+            <div class="source-header">
+                <div class="source-info">
+                    <h4>${source.name}</h4>
+                    <span class="source-type">${source.type === 'ical' ? '🔗 iCal' : '📊 Google'}</span>
+                    <span class="source-status ${source.enabled ? 'enabled' : 'disabled'}">
+                        ${source.enabled ? '✅ Enabled' : '❌ Disabled'}
+                    </span>
+                </div>
+                <div class="source-actions">
+                    <button class="btn btn-small ${source.enabled ? 'btn-warning' : 'btn-secondary'}" 
+                            onclick="toggleCalendarSource('${source.id}')">
+                        ${source.enabled ? '⏸️ Disable' : '▶️ Enable'}
+                    </button>
+                    <button class="btn btn-small btn-secondary" onclick="testCalendarSource('${source.id}')">🧪 Test</button>
+                    <button class="btn btn-small btn-danger" onclick="deleteCalendarSource('${source.id}')">🗑️ Delete</button>
+                </div>
+            </div>
+            <div class="source-details">
+                ${source.type === 'ical' ? 
+                    `<p><strong>URL:</strong> ${source.config.url}</p>` :
+                    `<p><strong>Calendar ID:</strong> ${source.config.calendarId}</p>`
+                }
+            </div>
+        `;
+        container.appendChild(sourceDiv);
+    });
+}
+
+// ===== NEW CALENDAR MANAGEMENT FUNCTIONS =====
+
+function toggleCalendarTypeFields() {
+    const type = document.getElementById('new-calendar-type').value;
+    const icalFields = document.getElementById('ical-fields');
+    const googleFields = document.getElementById('google-fields');
+    
+    if (type === 'ical') {
+        icalFields.style.display = 'block';
+        googleFields.style.display = 'none';
+    } else {
+        icalFields.style.display = 'none';
+        googleFields.style.display = 'block';
+    }
+}
+
+async function addCalendarSource() {
+    const name = document.getElementById('new-calendar-name').value.trim();
+    const type = document.getElementById('new-calendar-type').value;
+    
+    if (!name) {
+        alert('Please enter a calendar name');
+        return;
+    }
+    
+    const data = { name, type };
+    
+    if (type === 'ical') {
+        const url = document.getElementById('new-calendar-url').value.trim();
+        if (!url) {
+            alert('Please enter a calendar URL');
+            return;
+        }
+        data.url = url;
+    } else if (type === 'google') {
+        const apiKey = document.getElementById('new-google-api-key').value.trim();
+        const calendarId = document.getElementById('new-google-calendar-id').value.trim();
+        
+        if (!apiKey || !calendarId) {
+            alert('Please enter both API key and calendar ID for Google calendars');
+            return;
+        }
+        
+        data.apiKey = apiKey;
+        data.calendarId = calendarId;
+    }
+    
+    try {
+        const response = await fetch('/api/calendar/sources', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Calendar source added successfully!');
+            
+            // Clear the form
+            document.getElementById('new-calendar-name').value = '';
+            document.getElementById('new-calendar-url').value = '';
+            document.getElementById('new-google-api-key').value = '';
+            document.getElementById('new-google-calendar-id').value = '';
+            
+            // Refresh the calendar data
+            refreshCalendar();
+        } else {
+            alert(`Failed to add calendar source: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error adding calendar source:', error);
+        alert('Error adding calendar source');
+    }
+}
+
+async function toggleCalendarSource(sourceId) {
+    try {
+        // Get current state
+        const stateResponse = await fetch('/api/dashboard/state');
+        const state = await stateResponse.json();
+        const source = state.settings.calendarSources?.find(s => s.id === sourceId);
+        
+        if (!source) {
+            alert('Calendar source not found');
+            return;
+        }
+        
+        const response = await fetch(`/api/calendar/sources/${sourceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: !source.enabled })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Calendar source ${source.enabled ? 'disabled' : 'enabled'} successfully!`);
+            refreshCalendar();
+        } else {
+            alert(`Failed to update calendar source: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error toggling calendar source:', error);
+        alert('Error updating calendar source');
+    }
+}
+
+async function testCalendarSource(sourceId) {
+    try {
+        const response = await fetch(`/api/calendar/sources/${sourceId}/test`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`Calendar test successful!\n\nEvents found: ${result.eventsFound}\nMessage: ${result.message}`);
+        } else {
+            alert(`Calendar test failed: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error testing calendar source:', error);
+        alert('Error testing calendar source');
+    }
+}
+
+async function deleteCalendarSource(sourceId) {
+    if (!confirm('Are you sure you want to delete this calendar source?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/calendar/sources/${sourceId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Calendar source deleted successfully!');
+            refreshCalendar();
+        } else {
+            alert(`Failed to delete calendar source: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error deleting calendar source:', error);
+        alert('Error deleting calendar source');
+    }
+}
+
+async function testAllCalendars() {
+    try {
+        const stateResponse = await fetch('/api/dashboard/state');
+        const state = await stateResponse.json();
+        const sources = state.settings.calendarSources || [];
+        
+        if (sources.length === 0) {
+            alert('No calendar sources configured to test');
+            return;
+        }
+        
+        let results = '';
+        let totalEvents = 0;
+        
+        for (const source of sources) {
+            if (!source.enabled) continue;
+            
+            try {
+                const response = await fetch(`/api/calendar/sources/${source.id}/test`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    results += `✅ ${source.name}: ${result.eventsFound} events\n`;
+                    totalEvents += result.eventsFound;
+                } else {
+                    results += `❌ ${source.name}: ${result.error}\n`;
+                }
+            } catch (error) {
+                results += `❌ ${source.name}: Connection error\n`;
+            }
+        }
+        
+        alert(`Calendar Test Results:\n\n${results}\nTotal events found: ${totalEvents}`);
+    } catch (error) {
+        console.error('Error testing calendars:', error);
+        alert('Error testing calendars');
+    }
+}
+
+// AdminPanel is now initialized from the HTML file
+console.log('Admin panel script loaded successfully');
 
 // Clean up on page unload
 window.addEventListener('beforeunload', () => {

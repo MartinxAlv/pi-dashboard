@@ -217,6 +217,13 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('themeUpdated', theme);
     });
     
+    // Handle panel changes from admin panel
+    socket.on('panelsChanged', (panels) => {
+        console.log('📋 Panels updated:', panels);
+        // Broadcast panel changes to all connected dashboards
+        io.emit('panelsChanged', panels);
+    });
+    
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
     });

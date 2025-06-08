@@ -107,11 +107,15 @@ class SettingsService {
                 displayWidth: 800,
                 displayHeight: 480,
                 weatherApiKey: null,
-                googleCalendarApiKey: null,
-                calendarId: null,
                 maxCalendarEvents: 10,
+                calendarSources: [],
                 hueBridgeIp: null,
-                hueUsername: null
+                hueUsername: null,
+                panels: {
+                    datetime: true,
+                    calendar: true,
+                    hue: true
+                }
             },
             autoCycle: true,
             cycleInterval: 10000,

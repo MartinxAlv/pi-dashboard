@@ -6,6 +6,41 @@
     <title>Pi Dashboard Admin</title>
     <link rel="stylesheet" href="styles/admin.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Check if socket.io loaded properly
+        if (typeof io === 'undefined') {
+            console.error('Socket.IO failed to load');
+        } else {
+            console.log('Socket.IO loaded successfully');
+        }
+        
+        // Fallback connection status
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const statusDot = document.getElementById('status-dot');
+                const statusText = document.getElementById('status-text');
+                
+                if (statusText && statusText.textContent === 'Connecting...') {
+                    console.log('Testing basic connection...');
+                    
+                    // Test basic HTTP connection
+                    fetch('/api/dashboard/state')
+                        .then(response => {
+                            if (response.ok) {
+                                if (statusDot) statusDot.className = 'status-dot';
+                                if (statusText) statusText.textContent = 'Connected (HTTP)';
+                                console.log('Basic HTTP connection working');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Connection test failed:', error);
+                            if (statusDot) statusDot.className = 'status-dot disconnected';
+                            if (statusText) statusText.textContent = 'Connection Error';
+                        });
+                }
+            }, 3000);
+        });
+    </script>
 </head>
 <body>
     <div class="admin-container">
@@ -33,6 +68,7 @@
             <div class="controls-container">
                 <nav class="tab-navigation">
                     <button class="tab-button active" data-tab="navigation">🧭 Navigation</button>
+                    <button class="tab-button" data-tab="panels">📋 Panels</button>
                     <button class="tab-button" data-tab="weather">🌤️ Weather</button>
                     <button class="tab-button" data-tab="calendar">📅 Calendar</button>
                     <button class="tab-button" data-tab="hue">💡 Hue</button>
@@ -70,6 +106,52 @@
                                     <input type="number" id="cycle-interval" min="3" max="300" value="10">
                                     <button class="btn btn-secondary" onclick="updateCycleInterval()">Update</button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panels Tab -->
+                    <div class="tab-panel" id="panels">
+                        <div class="control-group">
+                            <h3>Dashboard Panel Management</h3>
+                            <p>Choose which panels to show on your dashboard. Disabled panels will be hidden and won't appear in navigation.</p>
+                            
+                            <div class="panel-controls">
+                                <div class="panel-item">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="panel-datetime" checked>
+                                        <span class="slider"></span>
+                                        <span class="label">🕐 Date, Time & Weather</span>
+                                    </label>
+                                    <p class="panel-description">Shows current time, date, weather info, and 5-day forecast</p>
+                                </div>
+                                
+                                <div class="panel-item">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="panel-calendar" checked>
+                                        <span class="slider"></span>
+                                        <span class="label">📅 Calendar & Events</span>
+                                    </label>
+                                    <p class="panel-description">Displays upcoming events from Google Calendar integration</p>
+                                </div>
+                                
+                                <div class="panel-item">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="panel-hue" checked>
+                                        <span class="slider"></span>
+                                        <span class="label">💡 Philips Hue Lights</span>
+                                    </label>
+                                    <p class="panel-description">Control Philips Hue smart lights, scenes, and brightness</p>
+                                </div>
+                            </div>
+                            
+                            <div class="panel-actions">
+                                <button class="btn btn-primary" onclick="savePanelSettings()">💾 Save Panel Settings</button>
+                                <button class="btn btn-secondary" onclick="resetPanelSettings()">🔄 Reset to All Enabled</button>
+                            </div>
+                            
+                            <div class="panel-info">
+                                <p>💡 <strong>Note:</strong> At least one panel must be enabled. Panel changes take effect immediately and will update navigation accordingly.</p>
                             </div>
                         </div>
                     </div>
@@ -139,7 +221,6 @@
                             <div class="weather-test">
                                 <button class="btn btn-accent" onclick="testWeather()">🌤️ Test Weather</button>
                                 <button class="btn btn-secondary" onclick="refreshWeather()">🔄 Refresh Weather</button>
-                                <button class="btn btn-secondary" onclick="checkApiUsage()">📊 Check API Usage</button>
                             </div>
                         </div>
                     </div>
@@ -147,67 +228,80 @@
                     <!-- Calendar Tab -->
                     <div class="tab-panel" id="calendar">
                         <div class="control-group">
-                            <h3>Google Calendar Integration</h3>
-                            <div class="input-group">
-                                <label for="calendar-api-key">API Key:</label>
-                                <input type="password" id="calendar-api-key" placeholder="Enter Google Calendar API key">
-                                <button class="btn btn-secondary" onclick="toggleCalendarApiKeyVisibility()">👁️</button>
-                                <button class="btn btn-secondary" onclick="updateCalendarApiKey()">Save Key</button>
-                                <button class="btn btn-secondary" onclick="showCurrentCalendarApiKey()">Show Current</button>
+                            <h3>📅 Calendar Sources</h3>
+                            <p>Add multiple calendar sources from Google Calendar, Apple Calendar (iCal), Canvas, and other iCal-compatible services.</p>
+                            
+                            <div class="calendar-sources-list" id="calendar-sources-list">
+                                <!-- Calendar sources will be loaded here -->
                             </div>
                             
-                            <div class="api-status" id="calendar-api-status">
-                                <span id="calendar-api-indicator">No Calendar API key saved</span>
-                            </div>
-                            
-                            <div class="api-help">
-                                <p>📝 <strong>Get your Google Calendar API key:</strong></p>
-                                <ol>
-                                    <li>Go to <a href="https://console.cloud.google.com/apis" target="_blank">Google Cloud Console</a></li>
-                                    <li>Create a new project or select existing one</li>
-                                    <li>Enable the "Google Calendar API"</li>
-                                    <li>Go to "Credentials" → "Create Credentials" → "API Key"</li>
-                                    <li>Copy the API key and paste it above</li>
-                                    <li>Optionally restrict the key to Calendar API only</li>
-                                </ol>
+                            <div class="add-calendar-section">
+                                <h4>➕ Add New Calendar</h4>
+                                <div class="input-group">
+                                    <label for="new-calendar-name">Calendar Name:</label>
+                                    <input type="text" id="new-calendar-name" placeholder="e.g., My Apple Calendar, Canvas Schedule">
+                                </div>
+                                
+                                <div class="input-group">
+                                    <label for="new-calendar-type">Calendar Type:</label>
+                                    <select id="new-calendar-type" onchange="toggleCalendarTypeFields()">
+                                        <option value="ical">iCal/Webcal URL (Apple, Canvas, etc.)</option>
+                                        <option value="google">Google Calendar (API)</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- iCal URL fields -->
+                                <div id="ical-fields" class="calendar-type-fields">
+                                    <div class="input-group">
+                                        <label for="new-calendar-url">Calendar URL:</label>
+                                        <input type="url" id="new-calendar-url" placeholder="https://... or webcal://...">
+                                    </div>
+                                    <div class="format-note">
+                                        <p>💡 <strong>iCal URL Examples:</strong></p>
+                                        <ul>
+                                            <li><strong>Apple Calendar:</strong> Copy "Calendar Address" from Calendar.app settings</li>
+                                            <li><strong>Canvas:</strong> Go to Calendar → Calendar Feed → Copy the URL</li>
+                                            <li><strong>Google Calendar:</strong> Calendar Settings → Integrate → Secret address in iCal format</li>
+                                            <li><strong>Outlook:</strong> Publish calendar and copy the ICS link</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <!-- Google Calendar API fields -->
+                                <div id="google-fields" class="calendar-type-fields" style="display: none;">
+                                    <div class="input-group">
+                                        <label for="new-google-api-key">Google API Key:</label>
+                                        <input type="password" id="new-google-api-key" placeholder="Enter Google Calendar API key">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="new-google-calendar-id">Calendar ID:</label>
+                                        <input type="text" id="new-google-calendar-id" placeholder="your-email@gmail.com">
+                                    </div>
+                                    <div class="format-note">
+                                        <p>📝 <strong>Get Google Calendar API key:</strong></p>
+                                        <ol>
+                                            <li>Go to <a href="https://console.cloud.google.com/apis" target="_blank">Google Cloud Console</a></li>
+                                            <li>Enable "Google Calendar API" and create API key</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                                
+                                <div class="calendar-actions">
+                                    <button class="btn btn-primary" onclick="addCalendarSource()">➕ Add Calendar</button>
+                                </div>
                             </div>
                         </div>
 
                         <div class="control-group">
                             <h3>Calendar Settings</h3>
                             <div class="input-group">
-                                <label for="calendar-id">Calendar ID:</label>
-                                <input type="text" id="calendar-id" placeholder="your-email@gmail.com or calendar-id">
-                                <button class="btn btn-secondary" onclick="updateCalendarId()">Update</button>
-                            </div>
-                            
-                            <div class="api-status" id="calendar-id-status">
-                                <span id="calendar-id-indicator">No Calendar ID saved</span>
-                            </div>
-                            
-                            <div class="city-format-help">
-                                <p>📅 <strong>Calendar ID Format:</strong></p>
-                                <div class="format-examples">
-                                    <div class="format-item">
-                                        <strong>Personal Gmail:</strong> your-email@gmail.com
-                                    </div>
-                                    <div class="format-item">
-                                        <strong>Google Calendar ID:</strong> abc123...@group.calendar.google.com
-                                    </div>
-                                    <div class="format-item">
-                                        <strong>Public Calendar:</strong> en.usa#holiday@group.v.calendar.google.com
-                                    </div>
-                                </div>
-                                <p class="format-note">💡 For personal calendars, use your Gmail address. For shared calendars, get the ID from Calendar Settings → Integrate Calendar</p>
-                            </div>
-                            
-                            <div class="input-group">
-                                <label for="max-events">Max Events:</label>
+                                <label for="max-events">Max Events to Display:</label>
                                 <select id="max-events">
                                     <option value="5">5 events</option>
                                     <option value="10" selected>10 events</option>
                                     <option value="15">15 events</option>
                                     <option value="20">20 events</option>
+                                    <option value="30">30 events</option>
                                 </select>
                                 <button class="btn btn-secondary" onclick="updateMaxEvents()">Update</button>
                             </div>
@@ -216,7 +310,7 @@
                         <div class="control-group">
                             <h3>Calendar Testing</h3>
                             <div class="weather-test">
-                                <button class="btn btn-accent" onclick="testCalendar()">📅 Test Calendar</button>
+                                <button class="btn btn-accent" onclick="testAllCalendars()">📅 Test All Calendars</button>
                                 <button class="btn btn-secondary" onclick="refreshCalendar()">🔄 Refresh Calendar</button>
                             </div>
                         </div>
@@ -356,16 +450,36 @@
                                     <span class="value" id="current-page-info">1</span>
                                 </div>
                                 <div class="info-item">
-                                    <span class="label">Last Updated:</span>
-                                    <span class="value" id="last-updated">--</span>
-                                </div>
-                                <div class="info-item">
                                     <span class="label">Weather API:</span>
                                     <span class="value" id="weather-api-status">Checking...</span>
                                 </div>
                                 <div class="info-item">
+                                    <span class="label">Weather Refresh:</span>
+                                    <span class="value">Every 30 minutes</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Weather Last Update:</span>
+                                    <span class="value" id="weather-last-update">Never</span>
+                                </div>
+                                <div class="info-item">
                                     <span class="label">Calendar API:</span>
                                     <span class="value" id="system-calendar-status">Checking...</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Calendar Refresh:</span>
+                                    <span class="value" id="calendar-refresh-info">Every 5 minutes</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Calendar Last Update:</span>
+                                    <span class="value" id="calendar-last-update">Never</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Calendar Next Update:</span>
+                                    <span class="value" id="calendar-next-update">Calculating...</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="label">Hue Lights Refresh:</span>
+                                    <span class="value">Every 30 seconds</span>
                                 </div>
                                 <div class="info-item">
                                     <span class="label">Data Storage:</span>
@@ -562,41 +676,64 @@
 
         // Tab functionality and initialization
         document.addEventListener('DOMContentLoaded', () => {
-            // Initialize existing admin panel
-            window.adminPanel = new AdminPanel();
-            
-            // Load saved theme
-            loadSavedTheme();
-            
-            // Add color picker event listeners
-            document.querySelectorAll('.color-picker').forEach(picker => {
-                picker.addEventListener('input', updateThemeColors);
-            });
-            
-            // Listen for page changes from the dashboard iframe
-            window.addEventListener('message', (event) => {
-                // Make sure the message is from our dashboard
-                if (event.data && event.data.type === 'pageChanged') {
-                    updateCurrentPageDisplay(event.data.pageIndex);
+            // Wait for AdminPanel to be available
+            function initializeAdminPanel() {
+                if (typeof AdminPanel !== 'undefined') {
+                    try {
+                        console.log('AdminPanel found, initializing...');
+                        window.adminPanel = new AdminPanel();
+                        
+                        // Load saved theme
+                        loadSavedTheme();
+                        
+                        // Add color picker event listeners
+                        document.querySelectorAll('.color-picker').forEach(picker => {
+                            picker.addEventListener('input', updateThemeColors);
+                        });
+                        
+                        // Listen for page changes from the dashboard iframe
+                        window.addEventListener('message', (event) => {
+                            // Make sure the message is from our dashboard
+                            if (event.data && event.data.type === 'pageChanged') {
+                                updateCurrentPageDisplay(event.data.pageIndex);
+                            }
+                        });
+                        
+                        // Add kiosk controls to admin page
+                        setupAdminKioskControls();
+                        
+                    } catch (error) {
+                        console.error('Admin panel initialization error:', error);
+                    }
+                } else {
+                    console.log('AdminPanel not yet available, retrying...');
+                    setTimeout(initializeAdminPanel, 100);
                 }
-            });
+            }
             
-            // Add kiosk controls to admin page
-            setupAdminKioskControls();
+            // Start trying to initialize
+            initializeAdminPanel();
             
-            // Add tab functionality
+            // Always add tab functionality (independent of admin panel)
             document.querySelectorAll('.tab-button').forEach(button => {
                 button.addEventListener('click', () => {
-                    // Remove active class from all buttons and panels
-                    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-                    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-                    
-                    // Add active class to clicked button
-                    button.classList.add('active');
-                    
-                    // Show corresponding panel
-                    const tabId = button.getAttribute('data-tab');
-                    document.getElementById(tabId).classList.add('active');
+                    try {
+                        // Remove active class from all buttons and panels
+                        document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                        
+                        // Add active class to clicked button
+                        button.classList.add('active');
+                        
+                        // Show corresponding panel
+                        const tabId = button.getAttribute('data-tab');
+                        const panel = document.getElementById(tabId);
+                        if (panel) {
+                            panel.classList.add('active');
+                        }
+                    } catch (tabError) {
+                        console.error('Tab switching error:', tabError);
+                    }
                 });
             });
         });

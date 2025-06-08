@@ -36,7 +36,7 @@ body {
     overflow: hidden;
 }
 
-/* Page System */
+/* Page System - Enhanced directional transitions */
 .page {
     position: absolute;
     width: 100%;
@@ -47,20 +47,50 @@ body {
     align-items: center;
     opacity: 0;
     transform: translateX(100%);
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    padding: 15px;
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    padding: 10px;
     background: var(--dashboard-card-bg);
     backdrop-filter: blur(10px);
     border: 1px solid var(--dashboard-card-border);
+    will-change: transform, opacity;
 }
 
 .page.active {
     opacity: 1;
     transform: translateX(0);
+    z-index: 2;
 }
 
+/* Directional transition states */
+.page.slide-out-left {
+    transform: translateX(-100%);
+    opacity: 0;
+    z-index: 1;
+}
+
+.page.slide-out-right {
+    transform: translateX(100%);
+    opacity: 0;
+    z-index: 1;
+}
+
+.page.slide-in-left {
+    transform: translateX(-100%);
+    opacity: 0;
+    z-index: 1;
+}
+
+.page.slide-in-right {
+    transform: translateX(100%);
+    opacity: 0;
+    z-index: 1;
+}
+
+/* Legacy support */
 .page.prev {
     transform: translateX(-100%);
+    opacity: 0;
+    z-index: 1;
 }
 
 /* DateTime Page - Fixed for 800x480 */
@@ -272,7 +302,8 @@ body {
     flex-direction: column;
     gap: 10px;
     overflow-y: auto;
-    max-height: 300px;
+    max-height: 400px;
+    scroll-behavior: smooth;
 }
 
 .event-item {
@@ -319,6 +350,13 @@ body {
 .event-date {
     font-size: 0.8rem;
     opacity: 0.7;
+}
+
+.event-source {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-top: 2px;
+    font-style: italic;
 }
 
 .loading {
@@ -512,30 +550,30 @@ body {
     max-width: 760px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 12px;
 }
 
 /* Scene Controls */
 .hue-scenes {
     display: flex;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .scene-btn {
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 15px;
-    padding: 12px 20px;
+    border-radius: 12px;
+    padding: 8px 16px;
     color: white;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
     backdrop-filter: blur(10px);
-    min-width: 90px;
+    min-width: 75px;
     text-align: center;
 }
 
@@ -559,21 +597,21 @@ body {
 .lights-container {
     flex: 1;
     overflow-y: auto;
-    max-height: 260px;
+    max-height: 320px;
 }
 
 .lights-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 15px;
-    padding: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    padding: 5px;
 }
 
 .light-card {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 15px;
-    padding: 15px;
+    border-radius: 12px;
+    padding: 10px;
     transition: all 0.3s ease;
     backdrop-filter: blur(10px);
     cursor: pointer;
@@ -637,7 +675,7 @@ body {
 .light-controls {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     opacity: 0.7;
     transition: opacity 0.3s ease;
     touch-action: manipulation; /* Prevent interference with sliders */
@@ -682,31 +720,31 @@ body {
 }
 
 .light-info {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.8);
-    margin-top: 5px;
+    margin-top: 3px;
 }
 
 /* Master Controls */
 .master-controls {
     display: flex;
     justify-content: center;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     margin-top: 5px;
 }
 
 .master-btn {
     background: rgba(255, 255, 255, 0.25);
     border: 2px solid rgba(255, 255, 255, 0.5);
-    border-radius: 20px;
-    padding: 12px 25px;
+    border-radius: 15px;
+    padding: 8px 20px;
     color: white;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
     backdrop-filter: blur(10px);
-    min-width: 140px;
+    min-width: 120px;
 }
 
 .master-btn:hover {
@@ -751,5 +789,79 @@ body {
         min-width: 70px;
         padding: 10px 15px;
         font-size: 0.8rem;
+    }
+}
+
+/* Touch Pause State for Cycle Control */
+.control-btn.touch-paused {
+    background: rgba(255, 193, 7, 0.3) !important; /* Orange background for touch pause */
+    border: 2px solid rgba(255, 193, 7, 0.8) !important;
+    animation: pulse-orange 2s infinite;
+}
+
+@keyframes pulse-orange {
+    0% { 
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    70% { 
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+    100% { 
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+    }
+}
+
+/* Optimizations for 800x480 screens (Raspberry Pi touch displays) */
+@media (max-width: 800px) and (max-height: 480px) {
+    .page {
+        padding: 8px;
+    }
+    
+    .hue-container {
+        gap: 8px;
+    }
+    
+    .hue-scenes {
+        margin-bottom: 8px;
+    }
+    
+    .scene-btn {
+        padding: 6px 12px;
+        font-size: 0.75rem;
+        min-width: 65px;
+    }
+    
+    .lights-container {
+        max-height: 280px;
+    }
+    
+    .lights-grid {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 8px;
+        padding: 2px;
+    }
+    
+    .light-card {
+        padding: 8px;
+        border-radius: 10px;
+    }
+    
+    .master-controls {
+        margin-bottom: 8px;
+    }
+    
+    .master-btn {
+        padding: 6px 16px;
+        font-size: 0.8rem;
+        min-width: 100px;
+    }
+    
+    .light-info {
+        font-size: 0.7rem;
+        margin-top: 2px;
+    }
+    
+    .light-controls {
+        gap: 4px;
     }
 }
