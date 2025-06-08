@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pi Dashboard Admin</title>
-    <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="styles/admin.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -34,6 +34,8 @@
                 <nav class="tab-navigation">
                     <button class="tab-button active" data-tab="navigation">🧭 Navigation</button>
                     <button class="tab-button" data-tab="weather">🌤️ Weather</button>
+                    <button class="tab-button" data-tab="calendar">📅 Calendar</button>
+                    <button class="tab-button" data-tab="hue">💡 Hue</button>
                     <button class="tab-button" data-tab="theme">🎨 Theme</button>
                     <button class="tab-button" data-tab="system">⚙️ System</button>
                     <button class="tab-button" data-tab="actions">🚀 Actions</button>
@@ -142,6 +144,152 @@
                         </div>
                     </div>
 
+                    <!-- Calendar Tab -->
+                    <div class="tab-panel" id="calendar">
+                        <div class="control-group">
+                            <h3>Google Calendar Integration</h3>
+                            <div class="input-group">
+                                <label for="calendar-api-key">API Key:</label>
+                                <input type="password" id="calendar-api-key" placeholder="Enter Google Calendar API key">
+                                <button class="btn btn-secondary" onclick="toggleCalendarApiKeyVisibility()">👁️</button>
+                                <button class="btn btn-secondary" onclick="updateCalendarApiKey()">Save Key</button>
+                                <button class="btn btn-secondary" onclick="showCurrentCalendarApiKey()">Show Current</button>
+                            </div>
+                            
+                            <div class="api-status" id="calendar-api-status">
+                                <span id="calendar-api-indicator">No Calendar API key saved</span>
+                            </div>
+                            
+                            <div class="api-help">
+                                <p>📝 <strong>Get your Google Calendar API key:</strong></p>
+                                <ol>
+                                    <li>Go to <a href="https://console.cloud.google.com/apis" target="_blank">Google Cloud Console</a></li>
+                                    <li>Create a new project or select existing one</li>
+                                    <li>Enable the "Google Calendar API"</li>
+                                    <li>Go to "Credentials" → "Create Credentials" → "API Key"</li>
+                                    <li>Copy the API key and paste it above</li>
+                                    <li>Optionally restrict the key to Calendar API only</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Calendar Settings</h3>
+                            <div class="input-group">
+                                <label for="calendar-id">Calendar ID:</label>
+                                <input type="text" id="calendar-id" placeholder="your-email@gmail.com or calendar-id">
+                                <button class="btn btn-secondary" onclick="updateCalendarId()">Update</button>
+                            </div>
+                            
+                            <div class="api-status" id="calendar-id-status">
+                                <span id="calendar-id-indicator">No Calendar ID saved</span>
+                            </div>
+                            
+                            <div class="city-format-help">
+                                <p>📅 <strong>Calendar ID Format:</strong></p>
+                                <div class="format-examples">
+                                    <div class="format-item">
+                                        <strong>Personal Gmail:</strong> your-email@gmail.com
+                                    </div>
+                                    <div class="format-item">
+                                        <strong>Google Calendar ID:</strong> abc123...@group.calendar.google.com
+                                    </div>
+                                    <div class="format-item">
+                                        <strong>Public Calendar:</strong> en.usa#holiday@group.v.calendar.google.com
+                                    </div>
+                                </div>
+                                <p class="format-note">💡 For personal calendars, use your Gmail address. For shared calendars, get the ID from Calendar Settings → Integrate Calendar</p>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="max-events">Max Events:</label>
+                                <select id="max-events">
+                                    <option value="5">5 events</option>
+                                    <option value="10" selected>10 events</option>
+                                    <option value="15">15 events</option>
+                                    <option value="20">20 events</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="updateMaxEvents()">Update</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Calendar Testing</h3>
+                            <div class="weather-test">
+                                <button class="btn btn-accent" onclick="testCalendar()">📅 Test Calendar</button>
+                                <button class="btn btn-secondary" onclick="refreshCalendar()">🔄 Refresh Calendar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hue Tab -->
+                    <div class="tab-panel" id="hue">
+                        <div class="control-group">
+                            <h3>Philips Hue Bridge Setup</h3>
+                            <div class="input-group">
+                                <label for="hue-bridge-ip">Bridge IP Address:</label>
+                                <input type="text" id="hue-bridge-ip" placeholder="192.168.1.100">
+                                <button class="btn btn-secondary" onclick="discoverHueBridge()">🔍 Discover</button>
+                                <button class="btn btn-secondary" onclick="updateHueBridgeIp()">Save IP</button>
+                            </div>
+                            
+                            <div class="api-status" id="hue-bridge-status">
+                                <span id="hue-bridge-indicator">No bridge IP saved</span>
+                            </div>
+                            
+                            <div class="api-help">
+                                <p>📝 <strong>Finding your Hue Bridge:</strong></p>
+                                <ol>
+                                    <li>Click "Discover" to automatically find your bridge</li>
+                                    <li>Or check your router's device list for "Philips-hue"</li>
+                                    <li>Bridge IP typically starts with 192.168.x.x</li>
+                                    <li>Save the IP address above</li>
+                                </ol>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Hue Authentication</h3>
+                            <div class="input-group">
+                                <label for="hue-username">Username (API Key):</label>
+                                <input type="password" id="hue-username" placeholder="Generated username from button press">
+                                <button class="btn btn-secondary" onclick="toggleHueUsernameVisibility()">👁️</button>
+                                <button class="btn btn-secondary" onclick="updateHueUsername()">Save Username</button>
+                                <button class="btn btn-secondary" onclick="showCurrentHueUsername()">Show Current</button>
+                            </div>
+                            
+                            <div class="api-status" id="hue-username-status">
+                                <span id="hue-username-indicator">No username saved</span>
+                            </div>
+                            
+                            <div class="api-help">
+                                <p>📝 <strong>Getting your Hue Username:</strong></p>
+                                <ol>
+                                    <li>Press the physical button on your Hue Bridge</li>
+                                    <li>Within 30 seconds, click "Create Username" below</li>
+                                    <li>The bridge will generate a username/API key</li>
+                                    <li>Save the generated username above</li>
+                                </ol>
+                                <button class="btn btn-accent" onclick="createHueUsername()">🔗 Create Username</button>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <h3>Hue Testing & Control</h3>
+                            <div class="weather-test">
+                                <button class="btn btn-accent" onclick="testHueConnection()">💡 Test Connection</button>
+                                <button class="btn btn-secondary" onclick="refreshHueLights()">🔄 Refresh Lights</button>
+                                <button class="btn btn-secondary" onclick="applyHueScene('bright')">☀️ Test Bright</button>
+                                <button class="btn btn-secondary" onclick="applyHueScene('dim')">🌙 Test Dim</button>
+                            </div>
+                            
+                            <div class="hue-test-results" id="hue-test-results" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px; display: none;">
+                                <strong>Test Results:</strong>
+                                <div id="hue-test-output"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Theme Tab -->
                     <div class="tab-panel" id="theme">
                         <div class="control-group">
@@ -216,8 +364,12 @@
                                     <span class="value" id="weather-api-status">Checking...</span>
                                 </div>
                                 <div class="info-item">
+                                    <span class="label">Calendar API:</span>
+                                    <span class="value" id="system-calendar-status">Checking...</span>
+                                </div>
+                                <div class="info-item">
                                     <span class="label">Data Storage:</span>
-                                    <span class="value">Server Memory (resets on restart)</span>
+                                    <span class="value">Persistent File Storage</span>
                                 </div>
                             </div>
                         </div>
@@ -227,12 +379,13 @@
                             <div class="storage-info">
                                 <p>💾 <strong>How settings are stored:</strong></p>
                                 <ul>
-                                    <li><strong>API Key & City:</strong> Stored in server memory (Docker container)</li>
-                                    <li><strong>Persistence:</strong> Settings reset when container restarts</li>
-                                    <li><strong>Defaults:</strong> Loaded from .env file on startup</li>
-                                    <li><strong>Browser:</strong> No data stored in browser cache/localStorage</li>
+                                    <li><strong>API Keys & Settings:</strong> Saved to persistent JSON file</li>
+                                    <li><strong>Persistence:</strong> Settings survive container restarts</li>
+                                    <li><strong>Backup:</strong> Automatic backups created before changes</li>
+                                    <li><strong>Location:</strong> /app/data/settings.json (Docker volume)</li>
+                                    <li><strong>Browser:</strong> No sensitive data stored in browser</li>
                                 </ul>
-                                <p class="storage-note">🔄 To persist settings across restarts, use the .env file or add a database later.</p>
+                                <p class="storage-note">✅ Your settings are automatically saved and will persist across all restarts.</p>
                             </div>
                         </div>
                     </div>
@@ -266,7 +419,7 @@
         </footer>
     </div>
 
-    <script src="admin.js"></script>
+    <script src="scripts/admin.js"></script>
     <script>
         // Theme customizer functions
         const presetThemes = {
@@ -468,13 +621,28 @@
             let touchTimeout = null;
             let isLongPress = false;
             
-            // Keyboard shortcuts for admin
+            // Keyboard shortcuts for admin - ONLY when NOT typing in form fields
             document.addEventListener('keydown', (e) => {
+                // Allow normal typing in form fields - more comprehensive check
+                if (e.target.matches('input, textarea, select') || 
+                    e.target.contentEditable === 'true' ||
+                    e.target.isContentEditable) {
+                    console.log('✅ Allowing normal typing in:', e.target.tagName, e.key);
+                    return; // Let the typing happen normally
+                }
+                
+                console.log('🎯 Admin shortcut candidate:', e.key, 'target:', e.target.tagName);
+                
                 switch(e.key) {
                     case 'F5':
+                        // Allow F5 normally for refresh
+                        console.log('🔄 F5 refresh allowed');
+                        break;
+                        
                     case 'r':
                     case 'R':
                         e.preventDefault();
+                        e.stopPropagation();
                         console.log('🔄 Refreshing admin panel...');
                         window.location.reload();
                         break;
@@ -483,12 +651,14 @@
                     case 'q':
                     case 'Q':
                         e.preventDefault();
+                        e.stopPropagation();
                         exitAdminKioskMode();
                         break;
                         
                     case 'd':
                     case 'D':
                         e.preventDefault();
+                        e.stopPropagation();
                         window.location.href = '/';
                         break;
                         
@@ -496,13 +666,28 @@
                     case 'H':
                     case '?':
                         e.preventDefault();
+                        e.stopPropagation();
                         showAdminHelpOverlay();
                         break;
                         
                     case 'f':
                     case 'F':
                         e.preventDefault();
+                        e.stopPropagation();
                         toggleAdminFullscreen();
+                        break;
+                        
+                    case ' ':
+                    case 'ArrowLeft':
+                    case 'ArrowRight':
+                    case 'c':
+                    case 'C':
+                    case 'a':
+                    case 'A':
+                        // Block these dashboard shortcuts completely
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('🚫 Blocked dashboard shortcut:', e.key);
                         break;
                 }
             });

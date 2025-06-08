@@ -13,13 +13,6 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
-      - DEFAULT_CITY=${DEFAULT_CITY:-Dallas,US}
-      - DEFAULT_UNITS=${DEFAULT_UNITS:-imperial}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
-      - AUTO_CYCLE_INTERVAL=${AUTO_CYCLE_INTERVAL:-10000}
-      - DISPLAY_WIDTH=${DISPLAY_WIDTH:-800}
-      - DISPLAY_HEIGHT=${DISPLAY_HEIGHT:-480}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]

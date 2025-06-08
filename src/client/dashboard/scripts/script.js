@@ -1,13 +1,14 @@
 class Dashboard {
     constructor() {
         this.currentPage = 0;
-        this.totalPages = 2;
+        this.totalPages = 3;
         this.autoCycle = true;
         this.cycleInterval = 10000;
         this.cycleTimer = null;
         this.socket = null;
         this.weatherUpdateInterval = null;
         this.calendarUpdateInterval = null;
+        this.hueUpdateInterval = null;
         this.statusEl = null; // Track the status element
         
         this.init();
@@ -19,8 +20,10 @@ class Dashboard {
         this.startClock();
         this.loadWeather();
         this.loadCalendar();
+        this.loadHue();
         this.startAutoCycle();
         this.loadTheme(); // Load saved theme
+        this.updateCycleButton(); // Initialize pause button state
         
         // Update weather every 30 minutes (instead of 10)
         this.weatherUpdateInterval = setInterval(() => {
@@ -31,6 +34,11 @@ class Dashboard {
         this.calendarUpdateInterval = setInterval(() => {
             this.loadCalendar();
         }, 5 * 60 * 1000);
+        
+        // Update Hue lights every 30 seconds
+        this.hueUpdateInterval = setInterval(() => {
+            this.loadHue();
+        }, 30 * 1000);
     }
 
     setupSocket() {
@@ -139,14 +147,7 @@ class Dashboard {
     }
 
     setupEventListeners() {
-        // Touch/click navigation
-        document.getElementById('nav-left').addEventListener('click', () => {
-            this.previousPage();
-        });
-        
-        document.getElementById('nav-right').addEventListener('click', () => {
-            this.nextPage();
-        });
+        // Navigation areas removed - using swipe gestures only
         
         // Page indicators
         document.querySelectorAll('.indicator').forEach((indicator, index) => {
@@ -155,8 +156,16 @@ class Dashboard {
             });
         });
         
-        // Keyboard navigation and kiosk controls
+        // Keyboard navigation and kiosk controls - DISABLED when in iframe (admin page)
         document.addEventListener('keydown', (e) => {
+            // Check if we're running in an iframe (admin page preview)
+            if (window !== window.top) {
+                console.log('🚫 Dashboard in iframe - keyboard shortcuts disabled');
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            
             switch(e.key) {
                 case 'ArrowLeft':
                     this.previousPage();
@@ -219,11 +228,9 @@ class Dashboard {
         });
         
         // Touch gestures for navigation - Simplified for single-touch screens
-        let touchStartX = 0;
+        let touchStartX = undefined;
         let touchEndX = 0;
         let touchStartTime = 0;
-        let touchTimeout = null;
-        let isLongPress = false;
         
         // Add touch debugging
         const debugTouch = (event, type) => {
@@ -238,46 +245,43 @@ class Dashboard {
         document.addEventListener('touchstart', (e) => {
             debugTouch(e, 'START');
             
+            // Check if touch is on an interactive element (sliders, buttons, etc.)
+            const target = e.target;
+            const isInteractive = target.matches('input[type="range"], .light-slider, button, .light-toggle, .scene-btn, .master-btn') ||
+                                 target.closest('.light-controls, .hue-scenes, .master-controls, .light-card');
+            
+            if (isInteractive) {
+                console.log('🎛️ Touch on interactive element, skipping swipe detection');
+                return; // Don't track swipe gestures on interactive elements
+            }
+            
             // Show visual touch indicator
             const touch = e.changedTouches[0];
             this.showTouchIndicator(touch.clientX, touch.clientY);
             
             touchStartX = touch.clientX;
             touchStartTime = Date.now();
-            isLongPress = false;
-            
-            // Clear any existing timeout
-            if (touchTimeout) {
-                clearTimeout(touchTimeout);
-            }
-            
-            // Set long press timer - Extended to 8 seconds
-            touchTimeout = setTimeout(() => {
-                isLongPress = true;
-                console.log('🔒 Long press detected (8 seconds)');
-                this.showQuickActions();
-            }, 8000); // 8 seconds for deliberate action
         });
         
         document.addEventListener('touchmove', (e) => {
-            // Cancel long press if user starts moving
-            if (touchTimeout) {
-                clearTimeout(touchTimeout);
-                touchTimeout = null;
-            }
+            // Touch move handling for swipe detection
         });
         
         document.addEventListener('touchend', (e) => {
             debugTouch(e, 'END');
             
-            // Clear long press timer
-            if (touchTimeout) {
-                clearTimeout(touchTimeout);
-                touchTimeout = null;
+            // Check if this touch started on an interactive element
+            const target = e.target;
+            const isInteractive = target.matches('input[type="range"], .light-slider, button, .light-toggle, .scene-btn, .master-btn') ||
+                                 target.closest('.light-controls, .hue-scenes, .master-controls, .light-card');
+            
+            if (isInteractive) {
+                console.log('🎛️ Touch end on interactive element, skipping swipe detection');
+                return; // Don't process swipe gestures on interactive elements
             }
             
-            // Don't process if it was a long press
-            if (isLongPress) {
+            // Only process swipe if we have valid start coordinates
+            if (touchStartX === undefined) {
                 return;
             }
             
@@ -305,23 +309,13 @@ class Dashboard {
             }
         });
         
-        // Also add mouse events as fallback for testing
+        // Mouse swipe detection for testing (no long press)
         let mouseStartX = 0;
-        let mouseStartTime = 0;
         let mousePressed = false;
         
         document.addEventListener('mousedown', (e) => {
             mouseStartX = e.clientX;
-            mouseStartTime = Date.now();
             mousePressed = true;
-            
-            // Long press with mouse - Updated to 5 seconds
-            setTimeout(() => {
-                if (mousePressed) {
-                    console.log('🖱️ Mouse long press (5 seconds)');
-                    this.showQuickActions();
-                }
-            }, 5000); // Changed from 8000ms to 5000ms
         });
         
         document.addEventListener('mouseup', (e) => {
@@ -329,11 +323,10 @@ class Dashboard {
             mousePressed = false;
             
             const mouseEndX = e.clientX;
-            const mouseDuration = Date.now() - mouseStartTime;
             const diff = mouseStartX - mouseEndX;
             
-            // Mouse swipe detection
-            if (Math.abs(diff) > 100 && mouseDuration < 500) {
+            // Mouse swipe detection only
+            if (Math.abs(diff) > 100) {
                 console.log('🖱️ Mouse swipe:', diff > 0 ? 'left' : 'right');
                 if (diff > 0) {
                     this.nextPage();
@@ -535,11 +528,28 @@ class Dashboard {
                 day: 'numeric'
             });
             
+            // Get icon based on event type/title
+            const getEventIcon = (title, isAllDay) => {
+                const lowerTitle = title.toLowerCase();
+                if (lowerTitle.includes('meeting') || lowerTitle.includes('call')) return '📞';
+                if (lowerTitle.includes('work') || lowerTitle.includes('office')) return '💼';
+                if (lowerTitle.includes('lunch') || lowerTitle.includes('dinner') || lowerTitle.includes('meal')) return '🍽️';
+                if (lowerTitle.includes('birthday') || lowerTitle.includes('party')) return '🎉';
+                if (lowerTitle.includes('appointment') || lowerTitle.includes('doctor') || lowerTitle.includes('medical')) return '🏥';
+                if (lowerTitle.includes('travel') || lowerTitle.includes('flight') || lowerTitle.includes('trip')) return '✈️';
+                if (lowerTitle.includes('exercise') || lowerTitle.includes('gym') || lowerTitle.includes('workout')) return '💪';
+                if (isAllDay) return '📅';
+                return '📋';
+            };
+            
             return `
                 <div class="event-item">
-                    <div class="event-title">${event.title}</div>
-                    <div class="event-time">${timeStr}</div>
-                    <div class="event-date">${dateStr}</div>
+                    <div class="event-icon">${getEventIcon(event.title, event.isAllDay)}</div>
+                    <div class="event-details">
+                        <div class="event-title">${event.title}</div>
+                        <div class="event-time">${timeStr}</div>
+                        <div class="event-date">${dateStr}</div>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -727,10 +737,11 @@ class Dashboard {
                 </div>
 
                 <div class="help-section">
-                    <h3>👆 Touch Gestures</h3>
+                    <h3>👆 Touch Controls</h3>
                     <div class="help-grid">
                         <span>Swipe left/right</span><span>Navigate pages</span>
-                        <span>Long press (5s)</span><span>Quick actions menu</span>
+                        <span>⚙️ Button (bottom-left)</span><span>Quick actions menu</span>
+                        <span>⏸️/▶️ Button (top-left)</span><span>Pause/resume auto-cycle</span>
                     </div>
                 </div>
 
@@ -995,6 +1006,251 @@ class Dashboard {
         if (this.statusEl && this.statusEl.parentNode) {
             this.statusEl.parentNode.removeChild(this.statusEl);
         }
+    }
+
+    // ===== HUE METHODS =====
+    async loadHue() {
+        try {
+            const response = await fetch('/api/hue');
+            const data = await response.json();
+            
+            if (response.ok && data.lights) {
+                this.displayHueLights(data.lights, data.configured);
+            } else {
+                console.warn('Hue API error:', data.error);
+                this.displayHueLights(data.lights || [], false);
+            }
+        } catch (error) {
+            console.error('Failed to load Hue lights:', error);
+            this.displayHueLights([], false);
+        }
+    }
+
+    displayHueLights(lights, configured) {
+        const lightsGrid = document.getElementById('lights-grid');
+        const masterToggle = document.getElementById('master-toggle');
+        const masterText = document.getElementById('master-text');
+        
+        if (!lightsGrid) return;
+
+        if (lights.length === 0) {
+            lightsGrid.innerHTML = `
+                <div class="loading">
+                    ${configured ? 'No lights found' : 'Hue not configured - showing demo lights'}
+                </div>
+            `;
+            return;
+        }
+
+        lightsGrid.innerHTML = lights.map(light => `
+            <div class="light-card ${light.on ? 'on' : ''}" data-light-id="${light.id}">
+                <div class="light-header">
+                    <div class="light-name">${light.name}</div>
+                    <div class="light-toggle ${light.on ? 'on' : ''}" onclick="toggleLight(${light.id})"></div>
+                </div>
+                <div class="light-controls">
+                    <input type="range" 
+                           class="light-slider" 
+                           min="1" 
+                           max="254" 
+                           value="${light.brightness || 1}"
+                           onchange="setBrightness(${light.id}, this.value)"
+                           ${!light.on ? 'disabled' : ''}>
+                    <div class="light-color" style="background: ${this.hueToRgb(light.hue, light.saturation)}"></div>
+                </div>
+                <div class="light-info">
+                    ${light.on ? `${Math.round((light.brightness || 1) / 254 * 100)}% brightness` : 'Off'}
+                    ${light.reachable ? '' : ' • Unreachable'}
+                </div>
+            </div>
+        `).join('');
+
+        // Update master toggle
+        const onLights = lights.filter(l => l.on).length;
+        const allLights = lights.length;
+        
+        if (masterText) {
+            if (onLights === 0) {
+                masterText.textContent = 'Turn All On';
+            } else if (onLights === allLights) {
+                masterText.textContent = 'Turn All Off';
+            } else {
+                masterText.textContent = `Turn All On (${onLights}/${allLights})`;
+            }
+        }
+    }
+
+    hueToRgb(hue, sat) {
+        if (!hue && !sat) return '#FFFFFF';
+        
+        const h = (hue || 0) / 65535;
+        const s = (sat || 0) / 254;
+        const l = 0.5;
+
+        const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        };
+
+        let r, g, b;
+        if (s === 0) {
+            r = g = b = l;
+        } else {
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1/3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1/3);
+        }
+
+        return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+    }
+
+    // Update the cycle control button state
+    updateCycleButton() {
+        const cycleControl = document.getElementById('cycle-control');
+        const cycleIcon = document.getElementById('cycle-icon');
+        
+        if (cycleControl && cycleIcon) {
+            if (this.autoCycle) {
+                cycleIcon.textContent = '⏸️';
+                cycleControl.classList.remove('paused');
+                cycleControl.title = 'Pause Auto-Cycle';
+            } else {
+                cycleIcon.textContent = '▶️';
+                cycleControl.classList.add('paused');
+                cycleControl.title = 'Resume Auto-Cycle';
+            }
+        }
+    }
+}
+
+// ===== GLOBAL HUE FUNCTIONS =====
+async function toggleLight(lightId) {
+    try {
+        const lightCard = document.querySelector(`[data-light-id="${lightId}"]`);
+        const isOn = lightCard?.classList.contains('on');
+        
+        const response = await fetch(`/api/hue/lights/${lightId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: !isOn })
+        });
+        
+        if (response.ok) {
+            // Refresh lights display
+            if (window.dashboard) window.dashboard.loadHue();
+        }
+    } catch (error) {
+        console.error('Failed to toggle light:', error);
+    }
+}
+
+async function setBrightness(lightId, brightness) {
+    try {
+        const response = await fetch(`/api/hue/lights/${lightId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bri: parseInt(brightness) })
+        });
+        
+        if (response.ok) {
+            // Update just the info text without full refresh
+            const lightCard = document.querySelector(`[data-light-id="${lightId}"]`);
+            if (lightCard) {
+                const infoEl = lightCard.querySelector('.light-info');
+                if (infoEl) {
+                    const percentage = Math.round(brightness / 254 * 100);
+                    infoEl.innerHTML = `${percentage}% brightness`;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to set brightness:', error);
+    }
+}
+
+async function applyScene(scene) {
+    try {
+        const response = await fetch(`/api/hue/scenes/${scene}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            // Refresh lights display
+            if (window.dashboard) window.dashboard.loadHue();
+        }
+    } catch (error) {
+        console.error('Failed to apply scene:', error);
+    }
+}
+
+async function toggleAllLights() {
+    try {
+        const lightsGrid = document.getElementById('lights-grid');
+        const onLights = lightsGrid?.querySelectorAll('.light-card.on').length || 0;
+        const allLights = lightsGrid?.querySelectorAll('.light-card').length || 0;
+        
+        // If any lights are on, turn all off. Otherwise, turn all on.
+        const targetState = onLights === 0;
+        
+        const response = await fetch('/api/hue/lights', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ on: targetState })
+        });
+        
+        if (response.ok) {
+            // Refresh lights display
+            if (window.dashboard) window.dashboard.loadHue();
+        }
+    } catch (error) {
+        console.error('Failed to toggle all lights:', error);
+    }
+}
+
+// ===== GLOBAL AUTO-CYCLE CONTROL =====
+function toggleAutoCycle() {
+    if (window.dashboard) {
+        const cycleControl = document.getElementById('cycle-control');
+        const cycleIcon = document.getElementById('cycle-icon');
+        
+        window.dashboard.autoCycle = !window.dashboard.autoCycle;
+        
+        if (window.dashboard.autoCycle) {
+            // Resume auto-cycling
+            cycleIcon.textContent = '⏸️';
+            cycleControl.classList.remove('paused');
+            cycleControl.title = 'Pause Auto-Cycle';
+            window.dashboard.startAutoCycle();
+            console.log('🔄 Auto-cycle resumed');
+        } else {
+            // Pause auto-cycling
+            cycleIcon.textContent = '▶️';
+            cycleControl.classList.add('paused');
+            cycleControl.title = 'Resume Auto-Cycle';
+            window.dashboard.stopAutoCycle();
+            console.log('⏸️ Auto-cycle paused');
+        }
+        
+        // Update the socket to sync with admin panel
+        if (window.dashboard.socket) {
+            window.dashboard.socket.emit('updateSettings', {
+                autoCycle: window.dashboard.autoCycle
+            });
+        }
+    }
+}
+
+// ===== GLOBAL QUICK ACTIONS FUNCTION =====
+function showQuickActions() {
+    if (window.dashboard) {
+        window.dashboard.showQuickActions();
     }
 }
 

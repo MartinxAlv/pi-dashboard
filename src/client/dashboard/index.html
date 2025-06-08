@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pi Dashboard</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="styles/style.css">
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -48,19 +48,59 @@
             </div>
         </div>
 
+        <!-- Page 3: Philips Hue Lights -->
+        <div class="page hue-page" id="page-2">
+            <div class="hue-header">
+                <h2>💡 Smart Lights</h2>
+            </div>
+            <div class="hue-container">
+                <!-- Master Controls - Moved to top -->
+                <div class="master-controls">
+                    <button class="master-btn" id="master-toggle" onclick="toggleAllLights()">
+                        <span id="master-text">Turn All On</span>
+                    </button>
+                </div>
+
+                <!-- Quick Scene Controls -->
+                <div class="hue-scenes">
+                    <button class="scene-btn bright" onclick="applyScene('bright')">☀️ Bright</button>
+                    <button class="scene-btn dim" onclick="applyScene('dim')">🌙 Dim</button>
+                    <button class="scene-btn relax" onclick="applyScene('relax')">🛋️ Relax</button>
+                    <button class="scene-btn energize" onclick="applyScene('energize')">⚡ Energize</button>
+                    <button class="scene-btn off" onclick="applyScene('off')">⭕ Off</button>
+                </div>
+
+                <!-- Individual Light Controls -->
+                <div class="lights-container">
+                    <div class="lights-grid" id="lights-grid">
+                        <div class="loading">Loading lights...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Page Navigation Dots -->
         <div class="page-indicators">
             <div class="indicator active" data-page="0"></div>
             <div class="indicator" data-page="1"></div>
+            <div class="indicator" data-page="2"></div>
         </div>
 
-        <!-- Touch Navigation Areas (invisible) -->
-        <div class="nav-area nav-left" id="nav-left"></div>
-        <div class="nav-area nav-right" id="nav-right"></div>
+        <!-- Touch Navigation Areas removed - using swipe gestures only -->
     </div>
 
     <!-- Status Indicator -->
     <div class="status-indicator" id="status">●</div>
-    <script src="script.js"></script>
+    
+    <!-- Auto-Cycle Control -->
+    <div class="cycle-control" id="cycle-control" onclick="toggleAutoCycle()" title="Toggle Auto-Cycle">
+        <span id="cycle-icon">⏸️</span>
+    </div>
+    
+    <!-- Help/Quick Actions Button -->
+    <div class="help-control" id="help-control" onclick="showQuickActions()" title="Quick Actions & Help">
+        <span>⚙️</span>
+    </div>
+    <script src="scripts/script.js"></script>
 </body>
 </html>
