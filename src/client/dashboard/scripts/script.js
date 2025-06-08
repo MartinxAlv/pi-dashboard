@@ -17,6 +17,7 @@ class Dashboard {
         this.isPaused = false; // Touch pause state
         this.countdownInterval = null; // Touch pause countdown
         this.touchPauseClickHandler = null; // Touch pause click handler
+        this.originalAutoCycleSetting = true; // Store original auto-cycle setting for touch pause
         
         this.init();
     }
@@ -116,6 +117,9 @@ class Dashboard {
             } else {
                 this.stopAutoCycle();
             }
+            
+            // Update the visual cycle button to match the new state
+            this.updateCycleButton();
         });
 
         // Listen for theme updates from admin
@@ -679,7 +683,8 @@ class Dashboard {
         const cycleIcon = document.getElementById('cycle-icon');
         
         if (cycleControl && cycleIcon) {
-            // Temporarily disable auto-cycle and show pause state
+            // Save original auto-cycle setting and temporarily disable
+            this.originalAutoCycleSetting = this.autoCycle;
             this.autoCycle = false;
             this.updateCycleButton();
             
@@ -730,8 +735,8 @@ class Dashboard {
         this.isPaused = false;
         this.hidePauseIndicator();
         
-        // Resume auto-cycling and calendar scrolling
-        if (this.autoCycle) {
+        // Resume auto-cycling and calendar scrolling with original setting
+        if (this.originalAutoCycleSetting) {
             this.startAutoCycle();
         }
         this.startCalendarAutoScroll();
@@ -741,8 +746,8 @@ class Dashboard {
         const cycleControl = document.getElementById('cycle-control');
         
         if (cycleControl) {
-            // Re-enable auto-cycle and restore normal appearance
-            this.autoCycle = true;
+            // Restore original auto-cycle setting
+            this.autoCycle = this.originalAutoCycleSetting;
             this.updateCycleButton();
             cycleControl.classList.remove('touch-paused');
             
@@ -961,6 +966,16 @@ class Dashboard {
             this.startAutoCycle();
         } else {
             this.stopAutoCycle();
+        }
+        
+        // Update button appearance
+        this.updateCycleButton();
+        
+        // Update the socket to sync with admin panel
+        if (this.socket) {
+            this.socket.emit('updateSettings', {
+                autoCycle: this.autoCycle
+            });
         }
         
         // Show brief notification
@@ -1445,6 +1460,9 @@ class Dashboard {
         const cycleIcon = document.getElementById('cycle-icon');
         
         if (cycleControl && cycleIcon) {
+            // Always clear touch-paused class when updating button state
+            cycleControl.classList.remove('touch-paused');
+            
             if (this.autoCycle) {
                 cycleIcon.textContent = '⏸️';
                 cycleControl.classList.remove('paused');
@@ -1546,26 +1564,18 @@ async function toggleAllLights() {
 // ===== GLOBAL AUTO-CYCLE CONTROL =====
 function toggleAutoCycle() {
     if (window.dashboard) {
-        const cycleControl = document.getElementById('cycle-control');
-        const cycleIcon = document.getElementById('cycle-icon');
-        
         window.dashboard.autoCycle = !window.dashboard.autoCycle;
         
         if (window.dashboard.autoCycle) {
-            // Resume auto-cycling
-            cycleIcon.textContent = '⏸️';
-            cycleControl.classList.remove('paused');
-            cycleControl.title = 'Pause Auto-Cycle';
             window.dashboard.startAutoCycle();
             console.log('🔄 Auto-cycle resumed');
         } else {
-            // Pause auto-cycling
-            cycleIcon.textContent = '▶️';
-            cycleControl.classList.add('paused');
-            cycleControl.title = 'Resume Auto-Cycle';
             window.dashboard.stopAutoCycle();
             console.log('⏸️ Auto-cycle paused');
         }
+        
+        // Update button appearance using the centralized method
+        window.dashboard.updateCycleButton();
         
         // Update the socket to sync with admin panel
         if (window.dashboard.socket) {

@@ -2,6 +2,7 @@ class AdminPanel {
     constructor() {
         this.socket = null;
         this.dashboardState = null;
+        this.updatingFromSocket = false; // Flag to prevent infinite loops
         
         this.init();
     }
@@ -42,7 +43,9 @@ class AdminPanel {
         
         this.socket.on('settingsUpdated', (state) => {
             this.dashboardState = state;
+            this.updatingFromSocket = true; // Set flag to prevent loop
             this.updateAdminDisplay(state);
+            this.updatingFromSocket = false; // Clear flag
         });
         
         statusDot.className = 'status-dot connecting';
@@ -54,9 +57,12 @@ class AdminPanel {
         const autoCycleToggle = document.getElementById('auto-cycle');
         if (autoCycleToggle) {
             autoCycleToggle.addEventListener('change', (e) => {
-                this.socket.emit('updateSettings', {
-                    autoCycle: e.target.checked
-                });
+                // Only emit if this isn't a programmatic update from socket
+                if (!this.updatingFromSocket) {
+                    this.socket.emit('updateSettings', {
+                        autoCycle: e.target.checked
+                    });
+                }
             });
         }
         
@@ -390,6 +396,46 @@ class AdminPanel {
         // Update API key status
         this.updateApiKeyStatus(state.settings && state.settings.weatherApiKey);
         
+        // Update weather API key field with masked value if saved
+        const weatherApiKeyField = document.getElementById('weather-api-key');
+        if (weatherApiKeyField) {
+            if (state.settings && state.settings.weatherApiKey) {
+                weatherApiKeyField.placeholder = '•••••••••••••••••••••••••••••••• (Key saved - enter new key to update)';
+                weatherApiKeyField.value = ''; // Keep field empty but show placeholder
+                weatherApiKeyField.title = 'API key is saved. Enter a new key to update it.';
+            } else {
+                weatherApiKeyField.placeholder = 'Enter your OpenWeatherMap API key';
+                weatherApiKeyField.title = '';
+            }
+        }
+        
+        // Update Hue bridge IP field if saved
+        const hueBridgeIpField = document.getElementById('hue-bridge-ip');
+        if (hueBridgeIpField) {
+            if (state.settings && state.settings.hueBridgeIp) {
+                hueBridgeIpField.value = state.settings.hueBridgeIp; // Show actual IP since it's not sensitive
+            } else {
+                hueBridgeIpField.value = ''; // Clear if no IP saved
+            }
+        }
+        
+        // Update Hue username field with masked value if saved
+        const hueUsernameField = document.getElementById('hue-username');
+        if (hueUsernameField) {
+            if (state.settings && state.settings.hueUsername) {
+                hueUsernameField.placeholder = '•••••••••••••••••••••••••••••••• (Username saved - enter new to update)';
+                hueUsernameField.value = ''; // Keep field empty but show placeholder
+                hueUsernameField.title = 'Username is saved. Enter a new username to update it.';
+            } else {
+                hueUsernameField.placeholder = 'Generated username from button press';
+                hueUsernameField.title = '';
+            }
+        }
+        
+        // Update Hue status indicators
+        this.updateHueBridgeStatus(state.settings && state.settings.hueBridgeIp);
+        this.updateHueUsernameStatus(state.settings && state.settings.hueUsername);
+        
         // Update panel settings if available
         if (state.settings && state.settings.panels) {
             this.updatePanelToggles(state.settings.panels);
@@ -439,6 +485,36 @@ class AdminPanel {
                 statusContainer.className = 'api-status has-key';
             } else {
                 statusElement.textContent = 'No API key saved';
+                statusContainer.className = 'api-status no-key';
+            }
+        }
+    }
+
+    updateHueBridgeStatus(hasBridgeIp) {
+        const statusElement = document.getElementById('hue-bridge-indicator');
+        const statusContainer = document.getElementById('hue-bridge-status');
+        
+        if (statusElement && statusContainer) {
+            if (hasBridgeIp) {
+                statusElement.textContent = `Bridge IP saved: ${hasBridgeIp}`;
+                statusContainer.className = 'api-status has-key';
+            } else {
+                statusElement.textContent = 'No bridge IP saved';
+                statusContainer.className = 'api-status no-key';
+            }
+        }
+    }
+
+    updateHueUsernameStatus(hasUsername) {
+        const statusElement = document.getElementById('hue-username-indicator');
+        const statusContainer = document.getElementById('hue-username-status');
+        
+        if (statusElement && statusContainer) {
+            if (hasUsername) {
+                statusElement.textContent = 'Username saved (•••••••••••••••)';
+                statusContainer.className = 'api-status has-key';
+            } else {
+                statusElement.textContent = 'No username saved';
                 statusContainer.className = 'api-status no-key';
             }
         }

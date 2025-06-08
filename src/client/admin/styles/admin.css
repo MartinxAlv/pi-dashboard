@@ -1003,6 +1003,17 @@ body {
     margin-top: 20px;
 }
 
+/* Styling for fields with saved data */
+input[type="password"][placeholder*="•"] {
+    background-color: rgba(76, 175, 80, 0.1);
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+input[type="password"][placeholder*="•"]:focus {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-color: #667eea;
+}
+
 @media (max-width: 768px) {
     .source-header {
         flex-direction: column;

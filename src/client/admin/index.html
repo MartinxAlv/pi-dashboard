@@ -162,7 +162,8 @@
                             <h3>API Configuration</h3>
                             <div class="input-group">
                                 <label for="weather-api-key">API Key:</label>
-                                <input type="password" id="weather-api-key">
+                                <input type="password" id="weather-api-key" 
+                                       oninput="this.placeholder='Enter your OpenWeatherMap API key'; this.title=''">
                                 <button class="btn btn-secondary" onclick="toggleApiKeyVisibility()">👁️</button>
                                 <button class="btn btn-secondary" onclick="updateApiKey()">Save Key</button>
                                 <button class="btn btn-secondary" onclick="showCurrentApiKey()">Show Current</button>
@@ -346,7 +347,8 @@
                             <h3>Hue Authentication</h3>
                             <div class="input-group">
                                 <label for="hue-username">Username (API Key):</label>
-                                <input type="password" id="hue-username" placeholder="Generated username from button press">
+                                <input type="password" id="hue-username" placeholder="Generated username from button press"
+                                       oninput="this.placeholder='Generated username from button press'; this.title=''">
                                 <button class="btn btn-secondary" onclick="toggleHueUsernameVisibility()">👁️</button>
                                 <button class="btn btn-secondary" onclick="updateHueUsername()">Save Username</button>
                                 <button class="btn btn-secondary" onclick="showCurrentHueUsername()">Show Current</button>

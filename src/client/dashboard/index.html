@@ -79,11 +79,131 @@
             </div>
         </div>
 
+        <!-- Page 4: System Information -->
+        <div class="page system-page" id="page-3">
+            <div class="system-header">
+                <h2>🔧 System Info</h2>
+            </div>
+            <div class="system-container">
+                <div class="system-grid">
+                    <!-- System Overview -->
+                    <div class="system-card">
+                        <h3>📟 System</h3>
+                        <div class="system-item">
+                            <span class="label">Hostname:</span>
+                            <span class="value" id="sys-hostname">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Platform:</span>
+                            <span class="value" id="sys-platform">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Architecture:</span>
+                            <span class="value" id="sys-arch">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Uptime:</span>
+                            <span class="value" id="sys-uptime">--</span>
+                        </div>
+                    </div>
+
+                    <!-- CPU Information -->
+                    <div class="system-card">
+                        <h3>⚡ CPU</h3>
+                        <div class="system-item">
+                            <span class="label">Model:</span>
+                            <span class="value" id="cpu-model">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Cores:</span>
+                            <span class="value" id="cpu-cores">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Usage:</span>
+                            <span class="value" id="cpu-usage">--%</span>
+                        </div>
+                        <div class="system-item" id="temp-item" style="display: none;">
+                            <span class="label">Temperature:</span>
+                            <span class="value" id="cpu-temp">--°C</span>
+                        </div>
+                    </div>
+
+                    <!-- Memory Information -->
+                    <div class="system-card">
+                        <h3>💾 Memory</h3>
+                        <div class="system-item">
+                            <span class="label">Total:</span>
+                            <span class="value" id="mem-total">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Used:</span>
+                            <span class="value" id="mem-used">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Free:</span>
+                            <span class="value" id="mem-free">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Usage:</span>
+                            <span class="value" id="mem-usage">--%</span>
+                        </div>
+                    </div>
+
+                    <!-- Storage Information -->
+                    <div class="system-card">
+                        <h3>💿 Storage</h3>
+                        <div class="system-item">
+                            <span class="label">Total:</span>
+                            <span class="value" id="storage-total">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Used:</span>
+                            <span class="value" id="storage-used">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Available:</span>
+                            <span class="value" id="storage-available">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">Usage:</span>
+                            <span class="value" id="storage-usage">--%</span>
+                        </div>
+                    </div>
+
+                    <!-- Network Information -->
+                    <div class="system-card">
+                        <h3>🌐 Network</h3>
+                        <div class="network-interfaces" id="network-interfaces">
+                            <div class="loading">Loading network info...</div>
+                        </div>
+                    </div>
+
+                    <!-- Load Average -->
+                    <div class="system-card">
+                        <h3>📊 Load Average</h3>
+                        <div class="system-item">
+                            <span class="label">1 min:</span>
+                            <span class="value" id="load-1min">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">5 min:</span>
+                            <span class="value" id="load-5min">--</span>
+                        </div>
+                        <div class="system-item">
+                            <span class="label">15 min:</span>
+                            <span class="value" id="load-15min">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Page Navigation Dots -->
         <div class="page-indicators">
             <div class="indicator active" data-page="0"></div>
             <div class="indicator" data-page="1"></div>
             <div class="indicator" data-page="2"></div>
+            <div class="indicator" data-page="3"></div>
         </div>
 
         <!-- Touch Navigation Areas removed - using swipe gestures only -->
