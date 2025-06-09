@@ -13,6 +13,11 @@ class AdminPanel {
         this.setupKioskControls(); // Add kiosk controls
         this.loadInitialData();
         this.startCalendarRefreshTimer(); // Start timer for calendar refresh countdown
+        
+        // Load timezone settings after a short delay
+        setTimeout(() => {
+            loadTimezoneSettings();
+        }, 1000);
     }
 
     setupSocket() {
@@ -79,38 +84,8 @@ class AdminPanel {
     }
 
     setupKioskControls() {
-        // Remove keyboard shortcuts and touch controls
-        // Admin page uses UI buttons instead
+        // Admin page uses UI buttons for controls
         console.log('🎮 Admin page using UI buttons for controls');
-        
-        // Disable all keyboard shortcuts to prevent interference with typing
-        document.addEventListener('keydown', (e) => {
-            // Allow normal typing in form fields - comprehensive check
-            if (e.target.matches('input, textarea, select') || 
-                e.target.contentEditable === 'true' ||
-                e.target.isContentEditable ||
-                e.target.closest('input, textarea, select')) {
-                console.log('✅ AdminJS: Allowing typing in form field:', e.target.tagName, e.key);
-                return; // Allow normal typing
-            }
-            
-            // Block most keyboard shortcuts when not in form fields
-            const blockedKeys = [' ', 'ArrowLeft', 'ArrowRight', 'c', 'C', 'a', 'A'];
-            
-            if (blockedKeys.includes(e.key)) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('🚫 AdminJS: Blocked keyboard shortcut:', e.key);
-            }
-        });
-        
-        // Only prevent context menu in kiosk scenarios
-        document.addEventListener('contextmenu', (e) => {
-            // Only prevent if not in a form field
-            if (!e.target.matches('input, textarea, select')) {
-                e.preventDefault();
-            }
-        });
     }
 
     // Kiosk helper methods for UI buttons
@@ -525,9 +500,10 @@ class AdminPanel {
         const calendarToggle = document.getElementById('panel-calendar');
         const hueToggle = document.getElementById('panel-hue');
         
-        if (datetimeToggle) datetimeToggle.checked = panels.datetime !== false;
-        if (calendarToggle) calendarToggle.checked = panels.calendar !== false;
-        if (hueToggle) hueToggle.checked = panels.hue !== false;
+        // Use explicit boolean values, defaulting to true only if undefined
+        if (datetimeToggle) datetimeToggle.checked = panels.datetime === undefined ? true : panels.datetime;
+        if (calendarToggle) calendarToggle.checked = panels.calendar === undefined ? true : panels.calendar;
+        if (hueToggle) hueToggle.checked = panels.hue === undefined ? true : panels.hue;
     }
 
     updateCurrentPageDisplay(pageIndex) {
@@ -1434,20 +1410,27 @@ function updateCalendarSourcesList(sources) {
     sources.forEach(source => {
         const sourceDiv = document.createElement('div');
         sourceDiv.className = 'calendar-source-item';
+        sourceDiv.style.borderLeft = `4px solid ${source.color || '#607D8B'}`;
         sourceDiv.innerHTML = `
             <div class="source-header">
                 <div class="source-info">
-                    <h4>${source.name}</h4>
-                    <span class="source-type">${source.type === 'ical' ? '🔗 iCal' : '📊 Google'}</span>
-                    <span class="source-status ${source.enabled ? 'enabled' : 'disabled'}">
-                        ${source.enabled ? '✅ Enabled' : '❌ Disabled'}
-                    </span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.3rem;">${getIconEmoji(source.icon || 'calendar')}</span>
+                        <h4 style="margin: 0; color: ${source.color || '#607D8B'};">${source.name}</h4>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <span class="source-type">${source.type === 'ical' ? '🔗 iCal' : '📊 Google'}</span>
+                        <span class="source-status ${source.enabled ? 'enabled' : 'disabled'}">
+                            ${source.enabled ? '✅ Enabled' : '❌ Disabled'}
+                        </span>
+                    </div>
                 </div>
                 <div class="source-actions">
                     <button class="btn btn-small ${source.enabled ? 'btn-warning' : 'btn-secondary'}" 
                             onclick="toggleCalendarSource('${source.id}')">
                         ${source.enabled ? '⏸️ Disable' : '▶️ Enable'}
                     </button>
+                    <button class="btn btn-small btn-accent" onclick="editCalendarSource('${source.id}')">✏️ Edit</button>
                     <button class="btn btn-small btn-secondary" onclick="testCalendarSource('${source.id}')">🧪 Test</button>
                     <button class="btn btn-small btn-danger" onclick="deleteCalendarSource('${source.id}')">🗑️ Delete</button>
                 </div>
@@ -1457,10 +1440,30 @@ function updateCalendarSourcesList(sources) {
                     `<p><strong>URL:</strong> ${source.config.url}</p>` :
                     `<p><strong>Calendar ID:</strong> ${source.config.calendarId}</p>`
                 }
+                <p><strong>Color:</strong> <span style="display: inline-block; width: 20px; height: 20px; background: ${source.color || '#607D8B'}; border-radius: 3px; margin-left: 5px; vertical-align: middle;"></span> ${source.color || '#607D8B'}</p>
             </div>
         `;
         container.appendChild(sourceDiv);
     });
+}
+
+// ===== ICON MAPPING FUNCTION =====
+function getIconEmoji(iconType) {
+    const iconMap = {
+        'calendar': '📅',
+        'work': '💼',
+        'personal': '🏠',
+        'school': '🎓',
+        'family': '👨‍👩‍👧‍👦',
+        'health': '🏥',
+        'sports': '⚽',
+        'travel': '✈️',
+        'birthday': '🎂',
+        'meeting': '📞',
+        'event': '🎉',
+        'task': '✅'
+    };
+    return iconMap[iconType] || '📅';
 }
 
 // ===== NEW CALENDAR MANAGEMENT FUNCTIONS =====
@@ -1482,13 +1485,15 @@ function toggleCalendarTypeFields() {
 async function addCalendarSource() {
     const name = document.getElementById('new-calendar-name').value.trim();
     const type = document.getElementById('new-calendar-type').value;
+    const icon = document.getElementById('new-calendar-icon').value || 'calendar';
+    const color = document.getElementById('new-calendar-color').value || '#607D8B';
     
     if (!name) {
         alert('Please enter a calendar name');
         return;
     }
     
-    const data = { name, type };
+    const data = { name, type, icon, color };
     
     if (type === 'ical') {
         const url = document.getElementById('new-calendar-url').value.trim();
@@ -1524,6 +1529,8 @@ async function addCalendarSource() {
             
             // Clear the form
             document.getElementById('new-calendar-name').value = '';
+            document.getElementById('new-calendar-icon').value = 'calendar';
+            document.getElementById('new-calendar-color').value = '#607D8B';
             document.getElementById('new-calendar-url').value = '';
             document.getElementById('new-google-api-key').value = '';
             document.getElementById('new-google-calendar-id').value = '';
@@ -1536,6 +1543,208 @@ async function addCalendarSource() {
     } catch (error) {
         console.error('Error adding calendar source:', error);
         alert('Error adding calendar source');
+    }
+}
+
+function editCalendarSource(sourceId) {
+    console.log('Edit calendar source called with ID:', sourceId);
+    
+    // Try to get state from adminPanel instance or window
+    const state = window.adminPanel?.dashboardState || window.dashboardState;
+    console.log('Dashboard state:', state);
+    
+    if (!state || !state.settings || !state.settings.calendarSources) {
+        alert('Calendar data not loaded yet. Please wait a moment and try again.');
+        return;
+    }
+    
+    const source = state.settings.calendarSources.find(s => s.id === sourceId);
+    console.log('Found source:', source);
+    
+    if (!source) {
+        alert('Calendar source not found');
+        return;
+    }
+    
+    // Create edit modal
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Calendar Source</h3>
+                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="edit-calendar-name">Calendar Name:</label>
+                    <input type="text" id="edit-calendar-name" value="${source.name}">
+                </div>
+                
+                <div class="input-group">
+                    <label for="edit-calendar-icon">Calendar Icon:</label>
+                    <select id="edit-calendar-icon" style="width: 200px;">
+                        <option value="calendar" ${(source.icon || 'calendar') === 'calendar' ? 'selected' : ''}>📅 Calendar</option>
+                        <option value="work" ${source.icon === 'work' ? 'selected' : ''}>💼 Work</option>
+                        <option value="personal" ${source.icon === 'personal' ? 'selected' : ''}>🏠 Personal</option>
+                        <option value="school" ${source.icon === 'school' ? 'selected' : ''}>🎓 School</option>
+                        <option value="family" ${source.icon === 'family' ? 'selected' : ''}>👨‍👩‍👧‍👦 Family</option>
+                        <option value="health" ${source.icon === 'health' ? 'selected' : ''}>🏥 Health</option>
+                        <option value="sports" ${source.icon === 'sports' ? 'selected' : ''}>⚽ Sports</option>
+                        <option value="travel" ${source.icon === 'travel' ? 'selected' : ''}>✈️ Travel</option>
+                        <option value="birthday" ${source.icon === 'birthday' ? 'selected' : ''}>🎂 Birthdays</option>
+                        <option value="meeting" ${source.icon === 'meeting' ? 'selected' : ''}>📞 Meetings</option>
+                        <option value="event" ${source.icon === 'event' ? 'selected' : ''}>🎉 Events</option>
+                        <option value="task" ${source.icon === 'task' ? 'selected' : ''}>✅ Tasks</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="edit-calendar-color">Calendar Color:</label>
+                    <input type="color" id="edit-calendar-color" value="${source.color || '#607D8B'}" style="width: 60px; height: 35px; border-radius: 5px; border: 1px solid #ccc;">
+                </div>
+                
+                ${source.type === 'ical' ? `
+                    <div class="input-group">
+                        <label for="edit-calendar-url">Calendar URL:</label>
+                        <input type="url" id="edit-calendar-url" value="${source.config.url || ''}">
+                    </div>
+                ` : `
+                    <div class="input-group">
+                        <label for="edit-google-api-key">Google API Key:</label>
+                        <input type="password" id="edit-google-api-key" value="${source.config.apiKey || ''}">
+                    </div>
+                    <div class="input-group">
+                        <label for="edit-google-calendar-id">Calendar ID:</label>
+                        <input type="text" id="edit-google-calendar-id" value="${source.config.calendarId || ''}">
+                    </div>
+                `}
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveCalendarSourceEdit('${sourceId}')">Save Changes</button>
+            </div>
+        </div>
+    `;
+    
+    // Add modal styles
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    const modalContent = modal.querySelector('.modal-content');
+    modalContent.style.cssText = `
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    `;
+    
+    modal.querySelector('.modal-header').style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    `;
+    
+    modal.querySelector('.modal-close').style.cssText = `
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    modal.querySelector('.modal-footer').style.cssText = `
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+async function saveCalendarSourceEdit(sourceId) {
+    const name = document.getElementById('edit-calendar-name').value.trim();
+    const icon = document.getElementById('edit-calendar-icon').value || 'calendar';
+    const color = document.getElementById('edit-calendar-color').value || '#607D8B';
+    
+    if (!name) {
+        alert('Please enter a calendar name');
+        return;
+    }
+    
+    const data = { name, icon, color };
+    
+    // Get calendar source to determine type
+    const state = window.adminPanel?.dashboardState || window.dashboardState;
+    const source = state?.settings?.calendarSources?.find(s => s.id === sourceId);
+    
+    if (source.type === 'ical') {
+        const url = document.getElementById('edit-calendar-url').value.trim();
+        if (!url) {
+            alert('Please enter a calendar URL');
+            return;
+        }
+        data.url = url;
+    } else if (source.type === 'google') {
+        const apiKey = document.getElementById('edit-google-api-key').value.trim();
+        const calendarId = document.getElementById('edit-google-calendar-id').value.trim();
+        
+        if (!apiKey || !calendarId) {
+            alert('Please enter both API key and calendar ID for Google calendars');
+            return;
+        }
+        
+        data.apiKey = apiKey;
+        data.calendarId = calendarId;
+    }
+    
+    try {
+        const response = await fetch(`/api/calendar/sources/${sourceId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('Calendar source updated successfully!');
+            
+            // Close modal
+            document.querySelector('.modal-overlay').remove();
+            
+            // Refresh the calendar data
+            refreshCalendar();
+        } else {
+            alert(`Failed to update calendar source: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error updating calendar source:', error);
+        alert('Error updating calendar source');
     }
 }
 
@@ -1655,6 +1864,108 @@ async function testAllCalendars() {
         alert('Error testing calendars');
     }
 }
+
+// ===== TIMEZONE MANAGEMENT FUNCTIONS =====
+
+async function updateTimezone() {
+    const timezone = document.getElementById('system-timezone').value;
+    
+    console.log('Updating timezone to:', timezone);
+    
+    try {
+        const response = await fetch('/api/dashboard/timezone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timezone })
+        });
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log('Response result:', result);
+        
+        if (result.success) {
+            alert('Timezone updated successfully!');
+            updateTimezoneDisplay();
+            
+            // The timezone setting will be broadcast via WebSocket to the dashboard
+            // No need to manually refresh since the dashboard listens for settingsUpdated events
+        } else {
+            alert(`Failed to update timezone: ${result.error}`);
+        }
+    } catch (error) {
+        console.error('Error updating timezone:', error);
+        alert(`Error updating timezone: ${error.message}`);
+    }
+}
+
+function loadTimezoneSettings() {
+    // Load timezone from dashboard state
+    const state = window.adminPanel?.dashboardState || window.dashboardState;
+    const savedTimezone = state?.settings?.timezone || 'auto';
+    
+    const timezoneSelect = document.getElementById('system-timezone');
+    if (timezoneSelect) {
+        timezoneSelect.value = savedTimezone;
+    }
+    
+    updateTimezoneDisplay();
+}
+
+function updateTimezoneDisplay() {
+    const timezoneSelect = document.getElementById('system-timezone');
+    const currentTimeDisplay = document.getElementById('current-time-display');
+    const selectedTimezoneDisplay = document.getElementById('selected-timezone-display');
+    
+    if (!timezoneSelect) return;
+    
+    const selectedTimezone = timezoneSelect.value;
+    const selectedOption = timezoneSelect.options[timezoneSelect.selectedIndex];
+    
+    // Update timezone display
+    if (selectedTimezoneDisplay) {
+        selectedTimezoneDisplay.textContent = selectedOption.textContent;
+    }
+    
+    // Update current time display
+    if (currentTimeDisplay) {
+        const now = new Date();
+        let timeString;
+        
+        if (selectedTimezone === 'auto') {
+            timeString = now.toLocaleString();
+        } else {
+            try {
+                timeString = now.toLocaleString('en-US', { 
+                    timeZone: selectedTimezone,
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            } catch (e) {
+                timeString = now.toLocaleString();
+            }
+        }
+        
+        currentTimeDisplay.textContent = timeString;
+    }
+}
+
+// Update time display every second
+setInterval(updateTimezoneDisplay, 1000);
+
+// Make functions globally accessible
+window.editCalendarSource = editCalendarSource;
+window.saveCalendarSourceEdit = saveCalendarSourceEdit;
+window.updateTimezone = updateTimezone;
+window.loadTimezoneSettings = loadTimezoneSettings;
 
 // AdminPanel is now initialized from the HTML file
 console.log('Admin panel script loaded successfully');

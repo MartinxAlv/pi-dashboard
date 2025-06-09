@@ -111,6 +111,7 @@ class Dashboard {
         this.socket.on('settingsUpdated', (state) => {
             this.autoCycle = state.autoCycle;
             this.cycleInterval = state.cycleInterval;
+            this.dashboardState = state; // Store state for timezone access
             
             if (this.autoCycle) {
                 this.startAutoCycle();
@@ -120,6 +121,12 @@ class Dashboard {
             
             // Update the visual cycle button to match the new state
             this.updateCycleButton();
+            
+            // If timezone changed, refresh calendar display
+            if (state.settings?.timezone) {
+                localStorage.setItem('dashboardTimezone', state.settings.timezone);
+                this.loadCalendar(); // Refresh to apply new timezone
+            }
         });
 
         // Listen for theme updates from admin
@@ -173,76 +180,6 @@ class Dashboard {
             });
         });
         
-        // Keyboard navigation and kiosk controls - DISABLED when in iframe (admin page)
-        document.addEventListener('keydown', (e) => {
-            // Check if we're running in an iframe (admin page preview)
-            if (window !== window.top) {
-                console.log('🚫 Dashboard in iframe - keyboard shortcuts disabled');
-                e.preventDefault();
-                e.stopPropagation();
-                return;
-            }
-            
-            switch(e.key) {
-                case 'ArrowLeft':
-                    this.previousPage();
-                    break;
-                case 'ArrowRight':
-                    this.nextPage();
-                    break;
-                case ' ':
-                    e.preventDefault();
-                    this.toggleAutoCycle();
-                    break;
-                    
-                // KIOSK CONTROLS
-                case 'F5':
-                case 'r':
-                case 'R':
-                    // Refresh page
-                    e.preventDefault();
-                    console.log('🔄 Refreshing dashboard...');
-                    window.location.reload();
-                    break;
-                    
-                case 'Escape':
-                case 'q':
-                case 'Q':
-                    // Exit kiosk/fullscreen mode
-                    e.preventDefault();
-                    this.exitKioskMode();
-                    break;
-                    
-                case 'f':
-                case 'F':
-                    // Toggle fullscreen
-                    e.preventDefault();
-                    this.toggleFullscreen();
-                    break;
-                    
-                case 'h':
-                case 'H':
-                case '?':
-                    // Show help overlay
-                    e.preventDefault();
-                    this.showHelpOverlay();
-                    break;
-                    
-                case 'a':
-                case 'A':
-                    // Open admin panel (redirect)
-                    e.preventDefault();
-                    window.location.href = '/admin';
-                    break;
-                    
-                case 'c':
-                case 'C':
-                    // Clear cache and reload
-                    e.preventDefault();
-                    this.clearCacheAndReload();
-                    break;
-            }
-        });
         
         // Touch gestures for navigation - Simplified for single-touch screens
         let touchStartX = undefined;
@@ -386,10 +323,11 @@ class Dashboard {
         const updateTime = () => {
             const now = new Date();
             
-            // Update time
+            // Update time with seconds
             const timeOptions = {
                 hour: '2-digit',
                 minute: '2-digit',
+                second: '2-digit',
                 hour12: true
             };
             document.getElementById('time').textContent = now.toLocaleTimeString('en-US', timeOptions);
@@ -466,6 +404,15 @@ class Dashboard {
         document.getElementById('weather-desc').textContent = currentWeather.description;
         document.getElementById('weather-location').textContent = `${currentWeather.city}, ${currentWeather.country}`;
         
+        // Add last updated timestamp
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+        });
+        document.getElementById('weather-updated').textContent = `Updated: ${timeStr}`;
+        
         // Update forecast if available
         if (weather.forecast && weather.forecast.length > 0) {
             this.updateForecastDisplay(weather.forecast);
@@ -529,49 +476,155 @@ class Dashboard {
             return;
         }
         
+        // Get timezone setting from dashboard state
+        const timezone = this.getTimezoneSettings();
+        
         const eventsHtml = events.map(event => {
-            const startDate = new Date(event.start);
-            const endDate = new Date(event.end);
+            // Use original timezone-aware strings when available (preserves correct time)
+            // Fall back to ISO strings for compatibility
+            const startDateStr = event.originalStart || event.start;
+            const endDateStr = event.originalEnd || event.end;
             
-            const timeStr = startDate.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true
-            });
+            const startDate = new Date(startDateStr);
+            const endDate = new Date(endDateStr);
             
-            const dateStr = startDate.toLocaleDateString('en-US', {
+            // Simplified logging - only show if there are issues
+            if (Math.abs(startDate.getTime() - new Date(event.start).getTime()) > 60000) {
+                console.log(`⚠️ Time difference detected for: ${event.title}`);
+                console.log(`  Original: ${startDateStr} vs ISO: ${event.start}`);
+            }
+            
+            // Create time range string (start - end time)
+            let timeStr;
+            if (event.isAllDay) {
+                timeStr = 'All Day';
+            } else {
+                // Always use the formatDateTime method for consistent timezone handling
+                const startTimeStr = this.formatDateTime(startDate, timezone, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                
+                const endTimeStr = this.formatDateTime(endDate, timezone, {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                
+                // If start and end are on the same day, just show time range
+                if (startDate.toDateString() === endDate.toDateString()) {
+                    timeStr = `${startTimeStr} - ${endTimeStr}`;
+                } else {
+                    // Multi-day event
+                    timeStr = `${startTimeStr} - ${this.formatDateTime(endDate, timezone, { month: 'short', day: 'numeric' })} ${endTimeStr}`;
+                }
+            }
+            
+            const dateStr = this.formatDateTime(startDate, timezone, {
                 weekday: 'short',
                 month: 'short',
                 day: 'numeric'
             });
             
-            // Get icon based on event type/title
-            const getEventIcon = (title, isAllDay) => {
-                const lowerTitle = title.toLowerCase();
-                if (lowerTitle.includes('meeting') || lowerTitle.includes('call')) return '📞';
-                if (lowerTitle.includes('work') || lowerTitle.includes('office')) return '💼';
-                if (lowerTitle.includes('lunch') || lowerTitle.includes('dinner') || lowerTitle.includes('meal')) return '🍽️';
-                if (lowerTitle.includes('birthday') || lowerTitle.includes('party')) return '🎉';
-                if (lowerTitle.includes('appointment') || lowerTitle.includes('doctor') || lowerTitle.includes('medical')) return '🏥';
-                if (lowerTitle.includes('travel') || lowerTitle.includes('flight') || lowerTitle.includes('trip')) return '✈️';
-                if (lowerTitle.includes('exercise') || lowerTitle.includes('gym') || lowerTitle.includes('workout')) return '💪';
-                if (isAllDay) return '📅';
-                return '📋';
+            // Icon mapping function
+            const getIconEmoji = (iconType) => {
+                const iconMap = {
+                    'calendar': '📅',
+                    'work': '💼',
+                    'personal': '🏠',
+                    'school': '🎓',
+                    'family': '👨‍👩‍👧‍👦',
+                    'health': '🏥',
+                    'sports': '⚽',
+                    'travel': '✈️',
+                    'birthday': '🎂',
+                    'meeting': '📞',
+                    'event': '🎉',
+                    'task': '✅'
+                };
+                return iconMap[iconType] || '📅';
+            };
+            
+            // Get calendar-based color and icon
+            const getCalendarVisuals = (event) => {
+                // If event has custom color and icon from calendar source, use them
+                if (event.color && event.icon) {
+                    return { color: event.color, icon: getIconEmoji(event.icon) };
+                }
+                
+                const source = event.source || 'default';
+                const title = (typeof event.title === 'object' ? 
+                    (event.title.val || event.title.value || 'Untitled Event') : 
+                    event.title).toLowerCase();
+                
+                // Calendar-specific colors and icons (fallback)
+                const calendarStyles = {
+                    'personal': { color: '#4CAF50', icon: '🏠' },
+                    'work': { color: '#2196F3', icon: '💼' },
+                    'family': { color: '#FF9800', icon: '👨‍👩‍👧‍👦' },
+                    'holidays': { color: '#F44336', icon: '🎉' },
+                    'birthdays': { color: '#E91E63', icon: '🎂' },
+                    'appointments': { color: '#9C27B0', icon: '🏥' },
+                    'default': { color: '#607D8B', icon: '📅' }
+                };
+                
+                // Try to match calendar source name
+                let style = calendarStyles.default;
+                for (const [key, val] of Object.entries(calendarStyles)) {
+                    if (source.toLowerCase().includes(key)) {
+                        style = val;
+                        break;
+                    }
+                }
+                
+                // If no calendar match, try title-based icons with calendar color
+                if (style === calendarStyles.default) {
+                    if (title.includes('meeting') || title.includes('call')) {
+                        style = { ...style, icon: '📞' };
+                    } else if (title.includes('lunch') || title.includes('dinner') || title.includes('meal')) {
+                        style = { ...style, icon: '🍽️' };
+                    } else if (title.includes('birthday') || title.includes('party')) {
+                        style = { ...style, icon: '🎉' };
+                    } else if (title.includes('appointment') || title.includes('doctor') || title.includes('medical')) {
+                        style = { ...style, icon: '🏥' };
+                    } else if (title.includes('travel') || title.includes('flight') || title.includes('trip')) {
+                        style = { ...style, icon: '✈️' };
+                    } else if (title.includes('exercise') || title.includes('gym') || title.includes('workout')) {
+                        style = { ...style, icon: '💪' };
+                    } else if (event.isAllDay) {
+                        style = { ...style, icon: '📅' };
+                    } else {
+                        style = { ...style, icon: '📋' };
+                    }
+                }
+                
+                return style;
             };
             
             // Handle title that might be an object or string
             const eventTitle = typeof event.title === 'object' ? 
                 (event.title.val || event.title.value || 'Untitled Event') : 
                 event.title;
+            
+            const calendarVisuals = getCalendarVisuals(event);
+            
+            // Helper function to convert hex to RGB
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? 
+                    `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : 
+                    '96, 125, 139'; // fallback color
+            };
 
             return `
-                <div class="event-item">
-                    <div class="event-icon">${getEventIcon(eventTitle, event.isAllDay)}</div>
+                <div class="event-item" style="border-left: 4px solid ${calendarVisuals.color};">
+                    <div class="event-icon" style="color: ${calendarVisuals.color};">${calendarVisuals.icon}</div>
                     <div class="event-details">
                         <div class="event-title">${eventTitle}</div>
-                        <div class="event-time">${event.isAllDay ? 'All Day' : timeStr}</div>
+                        <div class="event-time">${timeStr}</div>
                         <div class="event-date">${dateStr}</div>
-                        ${event.source ? `<div class="event-source">📍 ${event.source}</div>` : ''}
+                        ${event.source ? `<div class="event-source" style="color: ${calendarVisuals.color}; font-weight: 600; font-size: 0.85rem; background: rgba(${hexToRgb(calendarVisuals.color)}, 0.1); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;">${event.icon ? getIconEmoji(event.icon) : calendarVisuals.icon} ${event.source}</div>` : ''}
                     </div>
                 </div>
             `;
@@ -1067,20 +1120,6 @@ class Dashboard {
                 <h2>🎮 Dashboard Controls</h2>
                 
                 <div class="help-section">
-                    <h3>⌨️ Keyboard Shortcuts</h3>
-                    <div class="help-grid">
-                        <span>R or F5</span><span>Refresh page</span>
-                        <span>Q or Escape</span><span>Exit kiosk mode</span>
-                        <span>F</span><span>Toggle fullscreen</span>
-                        <span>H or ?</span><span>Show/hide this help</span>
-                        <span>A</span><span>Open admin panel</span>
-                        <span>C</span><span>Clear cache & reload</span>
-                        <span>Space</span><span>Toggle auto-cycle</span>
-                        <span>← →</span><span>Navigate pages</span>
-                    </div>
-                </div>
-
-                <div class="help-section">
                     <h3>👆 Touch Controls</h3>
                     <div class="help-grid">
                         <span>Swipe left/right</span><span>Navigate pages</span>
@@ -1090,7 +1129,7 @@ class Dashboard {
                 </div>
 
                 <div class="help-footer">
-                    <p>Press H, ? or tap anywhere to close</p>
+                    <p>Tap anywhere to close</p>
                 </div>
             </div>
         `;
@@ -1452,6 +1491,35 @@ class Dashboard {
         }
 
         return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+    }
+
+    // Get timezone settings
+    getTimezoneSettings() {
+        // Try to get from socket state first, then localStorage as fallback
+        const socketState = this.dashboardState || {};
+        const timezone = socketState.settings?.timezone || localStorage.getItem('dashboardTimezone') || 'auto';
+        // Timezone setting loaded
+        return timezone;
+    }
+    
+    // Format date/time with timezone
+    formatDateTime(date, timezone, options = {}) {
+        let result;
+        if (timezone === 'auto') {
+            result = date.toLocaleString('en-US', options);
+        } else {
+            try {
+                result = date.toLocaleString('en-US', { 
+                    ...options, 
+                    timeZone: timezone 
+                });
+            } catch (e) {
+                console.warn('Invalid timezone, falling back to auto:', timezone);
+                result = date.toLocaleString('en-US', options);
+            }
+        }
+        // Removed excessive logging
+        return result;
     }
 
     // Update the cycle control button state

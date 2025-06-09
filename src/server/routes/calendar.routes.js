@@ -117,7 +117,7 @@ router.post('/settings', (req, res) => {
 router.post('/sources', (req, res) => {
     try {
         const { dashboardState } = req.app.locals;
-        const { name, type, url, apiKey, calendarId } = req.body;
+        const { name, type, url, apiKey, calendarId, icon, color } = req.body;
         
         if (!name || !type) {
             return res.status(400).json({ error: 'Name and type are required' });
@@ -133,6 +133,8 @@ router.post('/sources', (req, res) => {
             name: name.trim(),
             type: type,
             enabled: true,
+            icon: icon || 'calendar',
+            color: color || '#607D8B',
             config: {}
         };
         
@@ -170,7 +172,7 @@ router.put('/sources/:id', (req, res) => {
     try {
         const { dashboardState } = req.app.locals;
         const { id } = req.params;
-        const { name, enabled, url, apiKey, calendarId } = req.body;
+        const { name, enabled, url, apiKey, calendarId, icon, color } = req.body;
         
         const sources = dashboardState.settings.calendarSources || [];
         const sourceIndex = sources.findIndex(s => s.id === id);
@@ -183,6 +185,8 @@ router.put('/sources/:id', (req, res) => {
         
         if (name) source.name = name.trim();
         if (enabled !== undefined) source.enabled = enabled;
+        if (icon) source.icon = icon;
+        if (color) source.color = color;
         
         if (source.type === 'ical' && url) {
             source.config.url = url.trim();

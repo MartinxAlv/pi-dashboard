@@ -178,6 +178,14 @@ body {
     color: var(--dashboard-text);
 }
 
+.weather-updated {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    color: var(--dashboard-text);
+    margin-top: 5px;
+    font-style: italic;
+}
+
 /* Forecast Container - Fixed Grid for 800px width */
 .forecast-container {
     background: var(--dashboard-card-bg);

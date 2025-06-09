@@ -242,6 +242,31 @@
                                     <label for="new-calendar-name">Calendar Name:</label>
                                     <input type="text" id="new-calendar-name" placeholder="e.g., My Apple Calendar, Canvas Schedule">
                                 </div>
+
+                                <div class="input-group">
+                                    <label for="new-calendar-icon">Calendar Icon:</label>
+                                    <select id="new-calendar-icon" style="width: 200px;">
+                                        <option value="calendar">📅 Calendar</option>
+                                        <option value="work">💼 Work</option>
+                                        <option value="personal">🏠 Personal</option>
+                                        <option value="school">🎓 School</option>
+                                        <option value="family">👨‍👩‍👧‍👦 Family</option>
+                                        <option value="health">🏥 Health</option>
+                                        <option value="sports">⚽ Sports</option>
+                                        <option value="travel">✈️ Travel</option>
+                                        <option value="birthday">🎂 Birthdays</option>
+                                        <option value="meeting">📞 Meetings</option>
+                                        <option value="event">🎉 Events</option>
+                                        <option value="task">✅ Tasks</option>
+                                    </select>
+                                    <small style="margin-left: 10px; color: #666;">Choose an icon type for this calendar</small>
+                                </div>
+
+                                <div class="input-group">
+                                    <label for="new-calendar-color">Calendar Color:</label>
+                                    <input type="color" id="new-calendar-color" value="#607D8B" style="width: 60px; height: 35px; border-radius: 5px; border: 1px solid #ccc;">
+                                    <small style="margin-left: 10px; color: #666;">Color for events and borders</small>
+                                </div>
                                 
                                 <div class="input-group">
                                     <label for="new-calendar-type">Calendar Type:</label>
@@ -487,6 +512,36 @@
                                     <span class="label">Data Storage:</span>
                                     <span class="value">Persistent File Storage</span>
                                 </div>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <h3>Timezone Settings</h3>
+                            <div class="input-group">
+                                <label for="system-timezone">Display Timezone:</label>
+                                <select id="system-timezone" style="width: 300px;">
+                                    <option value="auto">🌐 Auto-detect (Browser timezone)</option>
+                                    <option value="America/New_York">🇺🇸 Eastern Time (New York)</option>
+                                    <option value="America/Chicago">🇺🇸 Central Time (Chicago)</option>
+                                    <option value="America/Denver">🇺🇸 Mountain Time (Denver)</option>
+                                    <option value="America/Los_Angeles">🇺🇸 Pacific Time (Los Angeles)</option>
+                                    <option value="America/Anchorage">🇺🇸 Alaska Time (Anchorage)</option>
+                                    <option value="Pacific/Honolulu">🇺🇸 Hawaii Time (Honolulu)</option>
+                                    <option value="Europe/London">🇬🇧 GMT (London)</option>
+                                    <option value="Europe/Paris">🇫🇷 CET (Paris)</option>
+                                    <option value="Europe/Berlin">🇩🇪 CET (Berlin)</option>
+                                    <option value="Asia/Tokyo">🇯🇵 JST (Tokyo)</option>
+                                    <option value="Asia/Shanghai">🇨🇳 CST (Shanghai)</option>
+                                    <option value="Asia/Kolkata">🇮🇳 IST (Mumbai)</option>
+                                    <option value="Australia/Sydney">🇦🇺 AEDT (Sydney)</option>
+                                    <option value="UTC">🌍 UTC (Coordinated Universal Time)</option>
+                                </select>
+                                <button class="btn btn-primary" onclick="updateTimezone()" style="margin-left: 10px;">Save Timezone</button>
+                            </div>
+                            <div class="timezone-info" style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                                <p><strong>Current Time:</strong> <span id="current-time-display">Loading...</span></p>
+                                <p><strong>Selected Timezone:</strong> <span id="selected-timezone-display">Auto-detect</span></p>
+                                <small>💡 This setting controls how event times are displayed on the dashboard.</small>
                             </div>
                         </div>
                         
@@ -760,76 +815,6 @@
             let touchTimeout = null;
             let isLongPress = false;
             
-            // Keyboard shortcuts for admin - ONLY when NOT typing in form fields
-            document.addEventListener('keydown', (e) => {
-                // Allow normal typing in form fields - more comprehensive check
-                if (e.target.matches('input, textarea, select') || 
-                    e.target.contentEditable === 'true' ||
-                    e.target.isContentEditable) {
-                    console.log('✅ Allowing normal typing in:', e.target.tagName, e.key);
-                    return; // Let the typing happen normally
-                }
-                
-                console.log('🎯 Admin shortcut candidate:', e.key, 'target:', e.target.tagName);
-                
-                switch(e.key) {
-                    case 'F5':
-                        // Allow F5 normally for refresh
-                        console.log('🔄 F5 refresh allowed');
-                        break;
-                        
-                    case 'r':
-                    case 'R':
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log('🔄 Refreshing admin panel...');
-                        window.location.reload();
-                        break;
-                        
-                    case 'Escape':
-                    case 'q':
-                    case 'Q':
-                        e.preventDefault();
-                        e.stopPropagation();
-                        exitAdminKioskMode();
-                        break;
-                        
-                    case 'd':
-                    case 'D':
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.location.href = '/';
-                        break;
-                        
-                    case 'h':
-                    case 'H':
-                    case '?':
-                        e.preventDefault();
-                        e.stopPropagation();
-                        showAdminHelpOverlay();
-                        break;
-                        
-                    case 'f':
-                    case 'F':
-                        e.preventDefault();
-                        e.stopPropagation();
-                        toggleAdminFullscreen();
-                        break;
-                        
-                    case ' ':
-                    case 'ArrowLeft':
-                    case 'ArrowRight':
-                    case 'c':
-                    case 'C':
-                    case 'a':
-                    case 'A':
-                        // Block these dashboard shortcuts completely
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log('🚫 Blocked dashboard shortcut:', e.key);
-                        break;
-                }
-            });
 
             // Touch controls for admin
             document.addEventListener('touchstart', (e) => {
@@ -1074,17 +1059,6 @@
                     <h2>🎮 Admin Panel Controls</h2>
                     
                     <div class="admin-help-section">
-                        <h3>⌨️ Keyboard Shortcuts</h3>
-                        <div class="admin-help-grid">
-                            <span>R or F5</span><span>Refresh admin panel</span>
-                            <span>Q or Escape</span><span>Exit kiosk mode</span>
-                            <span>D</span><span>Open dashboard</span>
-                            <span>F</span><span>Toggle fullscreen</span>
-                            <span>H or ?</span><span>Show/hide this help</span>
-                        </div>
-                    </div>
-
-                    <div class="admin-help-section">
                         <h3>👆 Touch Gestures</h3>
                         <div class="admin-help-grid">
                             <span>Long press (8s)</span><span>Quick actions menu</span>
@@ -1092,7 +1066,7 @@
                     </div>
 
                     <div class="admin-help-footer">
-                        <p>Press H, ? or tap anywhere to close</p>
+                        <p>Tap anywhere to close</p>
                     </div>
                 </div>
             `;

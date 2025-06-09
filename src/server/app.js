@@ -99,6 +99,50 @@ app.get('/api/dashboard/settings-info', (req, res) => {
     }
 });
 
+// Timezone settings endpoint
+app.post('/api/dashboard/timezone', (req, res) => {
+    try {
+        const { timezone } = req.body;
+        
+        if (!timezone) {
+            return res.status(400).json({ error: 'Timezone is required' });
+        }
+        
+        // Validate timezone
+        const validTimezones = [
+            'auto', 'America/New_York', 'America/Chicago', 'America/Denver', 
+            'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu',
+            'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo',
+            'Asia/Shanghai', 'Asia/Kolkata', 'Australia/Sydney', 'UTC'
+        ];
+        
+        if (!validTimezones.includes(timezone)) {
+            return res.status(400).json({ error: 'Invalid timezone' });
+        }
+        
+        dashboardState.settings.timezone = timezone;
+        dashboardState.lastSaved = new Date().toISOString();
+        
+        // Save settings
+        settingsService.saveSettings(dashboardState);
+        
+        // Broadcast settings change to all connected clients
+        io.emit('settingsUpdated', dashboardState);
+        
+        console.log(`✅ Timezone updated to: ${timezone}`);
+        
+        res.json({ 
+            success: true, 
+            timezone: timezone,
+            message: `Timezone set to ${timezone}` 
+        });
+        
+    } catch (error) {
+        console.error('Error updating timezone:', error);
+        res.status(500).json({ error: 'Failed to update timezone' });
+    }
+});
+
 // API Routes
 app.get('/api/dashboard/state', (req, res) => {
     res.json(dashboardState);
@@ -106,7 +150,7 @@ app.get('/api/dashboard/state', (req, res) => {
 
 app.post('/api/dashboard/settings', (req, res) => {
     try {
-        const { city, units, cycleInterval, autoCycle, weatherApiKey } = req.body;
+        const { city, units, cycleInterval, autoCycle, weatherApiKey, panels } = req.body;
         
         if (city) {
             dashboardState.settings.city = city.trim().replace(/\s*,\s*/, ',');
@@ -122,6 +166,10 @@ app.post('/api/dashboard/settings', (req, res) => {
             } else {
                 return res.status(400).json({ error: 'Invalid API key format' });
             }
+        }
+        if (panels && typeof panels === 'object') {
+            dashboardState.settings.panels = panels;
+            console.log('Panel settings updated:', panels);
         }
         
         // Save settings to file
