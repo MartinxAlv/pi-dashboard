@@ -206,6 +206,7 @@ class Dashboard {
             
             if (isInteractive) {
                 console.log('🎛️ Touch on interactive element, skipping swipe detection');
+                e.stopPropagation(); // Prevent event bubbling
                 return; // Don't track swipe gestures on interactive elements
             }
             
@@ -231,6 +232,7 @@ class Dashboard {
             
             if (isInteractive) {
                 console.log('🎛️ Touch end on interactive element, skipping swipe detection');
+                e.stopPropagation(); // Prevent event bubbling
                 return; // Don't process swipe gestures on interactive elements
             }
             
@@ -268,11 +270,32 @@ class Dashboard {
         let mousePressed = false;
         
         document.addEventListener('mousedown', (e) => {
+            // Check if mouse is on an interactive element
+            const target = e.target;
+            const isInteractive = target.matches('input[type="range"], .light-slider, button, .light-toggle, .scene-btn, .master-btn') ||
+                                 target.closest('.light-controls, .hue-scenes, .master-controls, .light-card');
+            
+            if (isInteractive) {
+                e.stopPropagation(); // Prevent event bubbling
+                return; // Don't track mouse gestures on interactive elements
+            }
+            
             mouseStartX = e.clientX;
             mousePressed = true;
         });
         
         document.addEventListener('mouseup', (e) => {
+            // Check if mouse is on an interactive element
+            const target = e.target;
+            const isInteractive = target.matches('input[type="range"], .light-slider, button, .light-toggle, .scene-btn, .master-btn') ||
+                                 target.closest('.light-controls, .hue-scenes, .master-controls, .light-card');
+            
+            if (isInteractive) {
+                e.stopPropagation(); // Prevent event bubbling
+                mousePressed = false; // Reset state
+                return; // Don't track mouse gestures on interactive elements
+            }
+            
             if (!mousePressed) return;
             mousePressed = false;
             
@@ -384,22 +407,17 @@ class Dashboard {
     }
 
     updateWeatherDisplay(weather) {
-        const iconMap = {
-            '01d': '☀️', '01n': '🌙',
-            '02d': '⛅', '02n': '⛅',
-            '03d': '☁️', '03n': '☁️',
-            '04d': '☁️', '04n': '☁️',
-            '09d': '🌧️', '09n': '🌧️',
-            '10d': '🌦️', '10n': '🌦️',
-            '11d': '⛈️', '11n': '⛈️',
-            '13d': '❄️', '13n': '❄️',
-            '50d': '🌫️', '50n': '🌫️'
-        };
-        
         // Handle both old format (direct weather) and new format (with current + forecast)
         const currentWeather = weather.current || weather;
         
-        document.getElementById('weather-icon').textContent = iconMap[currentWeather.icon] || '🌤️';
+        // Use OpenWeatherMap's actual weather icons
+        const iconCode = currentWeather.icon;
+        const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+        const weatherIconElement = document.getElementById('weather-icon');
+        
+        // Replace emoji with actual weather icon
+        weatherIconElement.innerHTML = `<img src="${iconUrl}" alt="${currentWeather.description}" class="weather-icon-img">`;
+        
         document.getElementById('temperature').textContent = `${currentWeather.temperature}°`;
         document.getElementById('weather-desc').textContent = currentWeather.description;
         document.getElementById('weather-location').textContent = `${currentWeather.city}, ${currentWeather.country}`;
@@ -422,27 +440,20 @@ class Dashboard {
     updateForecastDisplay(forecast) {
         const forecastContainer = document.getElementById('forecast-list');
         
-        const iconMap = {
-            '01d': '☀️', '01n': '☀️',
-            '02d': '⛅', '02n': '⛅',
-            '03d': '☁️', '03n': '☁️',
-            '04d': '☁️', '04n': '☁️',
-            '09d': '🌧️', '09n': '🌧️',
-            '10d': '🌦️', '10n': '🌦️',
-            '11d': '⛈️', '11n': '⛈️',
-            '13d': '❄️', '13n': '❄️',
-            '50d': '🌫️', '50n': '🌫️'
-        };
-        
         const forecastHtml = forecast.map(day => {
             const date = new Date(day.date);
             const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
             const isToday = date.toDateString() === new Date().toDateString();
             
+            // Use OpenWeatherMap's actual weather icons
+            const iconUrl = `https://openweathermap.org/img/wn/${day.icon}@2x.png`;
+            
             return `
                 <div class="forecast-item">
                     <div class="forecast-day">${isToday ? 'Today' : dayName}</div>
-                    <div class="forecast-icon">${iconMap[day.icon] || '🌤️'}</div>
+                    <div class="forecast-icon">
+                        <img src="${iconUrl}" alt="${day.description}" class="forecast-icon-img">
+                    </div>
                     <div class="forecast-temps">
                         <div class="forecast-high">${day.temperature.high}°</div>
                         <div class="forecast-low">${day.temperature.low}°</div>
@@ -1438,6 +1449,12 @@ class Dashboard {
                            max="254" 
                            value="${light.brightness || 1}"
                            onchange="setBrightness(${light.id}, this.value)"
+                           ontouchstart="event.stopPropagation()"
+                           ontouchmove="event.stopPropagation()"
+                           ontouchend="event.stopPropagation()"
+                           onmousedown="event.stopPropagation()"
+                           onmousemove="event.stopPropagation()"
+                           onmouseup="event.stopPropagation()"
                            ${!light.on ? 'disabled' : ''}>
                     <div class="light-color" style="background: ${this.hueToRgb(light.hue, light.saturation)}"></div>
                 </div>

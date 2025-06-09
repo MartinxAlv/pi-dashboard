@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
             });
         }
 
-        const city = req.query.city || dashboardState.settings.city || 'Dallas,US';
+        const city = req.query.city || dashboardState.settings.city || 'Garland,US';
         const units = req.query.units || dashboardState.settings.units || 'imperial';
         
         const weatherData = await weatherService.getCurrentWeatherAndForecast(apiKey, city, units);

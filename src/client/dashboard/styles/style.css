@@ -152,6 +152,12 @@ body {
     flex-shrink: 0;
 }
 
+.weather-icon-img {
+    width: 55px;
+    height: 55px;
+    object-fit: contain;
+}
+
 .weather-details {
     flex: 1;
     text-align: left;
@@ -243,6 +249,12 @@ body {
 .forecast-icon {
     font-size: 1.4rem;
     margin-bottom: 4px;
+}
+
+.forecast-icon-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
 }
 
 .forecast-temps {

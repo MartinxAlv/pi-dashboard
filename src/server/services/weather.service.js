@@ -66,34 +66,54 @@ class WeatherService {
         const forecastList = forecastResponse.data.list;
         const dailyForecasts = [];
         
-        // Group forecasts by date and pick the one closest to noon
+        // Group forecasts by date and calculate actual daily highs/lows
         const forecastsByDate = {};
         forecastList.forEach(forecast => {
             const date = new Date(forecast.dt * 1000).toDateString();
             const hour = new Date(forecast.dt * 1000).getHours();
+            const temp = forecast.main.temp;
             
-            if (!forecastsByDate[date] || Math.abs(hour - 12) < Math.abs(forecastsByDate[date].hour - 12)) {
+            if (!forecastsByDate[date]) {
                 forecastsByDate[date] = {
-                    ...forecast,
-                    hour: hour,
-                    date: date
+                    forecasts: [],
+                    maxTemp: temp,
+                    minTemp: temp,
+                    noonForecast: null,
+                    noonHourDiff: 24
                 };
+            }
+            
+            // Track all forecasts for this date
+            forecastsByDate[date].forecasts.push(forecast);
+            
+            // Update daily max/min temperatures
+            forecastsByDate[date].maxTemp = Math.max(forecastsByDate[date].maxTemp, temp);
+            forecastsByDate[date].minTemp = Math.min(forecastsByDate[date].minTemp, temp);
+            
+            // Find forecast closest to noon for weather icon/description
+            const hourDiff = Math.abs(hour - 12);
+            if (hourDiff < forecastsByDate[date].noonHourDiff) {
+                forecastsByDate[date].noonForecast = forecast;
+                forecastsByDate[date].noonHourDiff = hourDiff;
             }
         });
         
         // Convert to array and take first 5 days
-        Object.values(forecastsByDate).slice(0, 5).forEach(forecast => {
+        Object.keys(forecastsByDate).slice(0, 5).forEach(dateStr => {
+            const dayData = forecastsByDate[dateStr];
+            const noonForecast = dayData.noonForecast;
+            
             dailyForecasts.push({
-                date: new Date(forecast.dt * 1000),
+                date: new Date(noonForecast.dt * 1000),
                 temperature: {
-                    high: Math.round(forecast.main.temp_max),
-                    low: Math.round(forecast.main.temp_min),
-                    current: Math.round(forecast.main.temp)
+                    high: Math.round(dayData.maxTemp),
+                    low: Math.round(dayData.minTemp),
+                    current: Math.round(noonForecast.main.temp)
                 },
-                description: forecast.weather[0].description,
-                icon: forecast.weather[0].icon,
-                humidity: forecast.main.humidity,
-                windSpeed: forecast.wind.speed
+                description: noonForecast.weather[0].description,
+                icon: noonForecast.weather[0].icon,
+                humidity: noonForecast.main.humidity,
+                windSpeed: noonForecast.wind.speed
             });
         });
         

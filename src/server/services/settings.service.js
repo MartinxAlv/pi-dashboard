@@ -102,7 +102,7 @@ class SettingsService {
     getDefaultSettings() {
         return {
             settings: {
-                city: 'Dallas,US',
+                city: 'Garland,US',
                 units: 'imperial',
                 displayWidth: 800,
                 displayHeight: 480,
