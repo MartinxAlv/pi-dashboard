@@ -1,8 +1,10 @@
 # Dependencies
 node_modules/
 
-# Environment variables (not used - settings are stored in data/settings.json)
-# .env
+# Environment variables
+.env
+.env.*
+!.env.example
 
 # Logs
 logs/
