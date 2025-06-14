@@ -815,11 +815,12 @@
             let touchTimeout = null;
             let isLongPress = false;
             
+            // Normal cursor behavior for admin dashboard (always visible for editing)
 
             // Touch controls for admin
             document.addEventListener('touchstart', (e) => {
                 const touch = e.changedTouches[0];
-                showAdminTouchIndicator(touch.clientX, touch.clientY);
+                // Touch indicator removed for Pi consistency
                 
                 touchStartX = touch.clientX;
                 touchStartTime = Date.now();
@@ -962,37 +963,7 @@
             document.body.appendChild(overlay);
         }
 
-        function showAdminTouchIndicator(x, y) {
-            const indicator = document.createElement('div');
-            indicator.style.cssText = `
-                position: fixed;
-                left: ${x - 25}px;
-                top: ${y - 25}px;
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                background: rgba(102, 126, 234, 0.5);
-                border: 2px solid var(--primary-color, #667eea);
-                z-index: 999998;
-                pointer-events: none;
-                animation: adminTouchPulse 0.6s ease-out forwards;
-            `;
-
-            if (!document.getElementById('admin-touch-indicator-style')) {
-                const style = document.createElement('style');
-                style.id = 'admin-touch-indicator-style';
-                style.textContent = `
-                    @keyframes adminTouchPulse {
-                        0% { transform: scale(0.5); opacity: 1; }
-                        100% { transform: scale(2); opacity: 0; }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-
-            document.body.appendChild(indicator);
-            setTimeout(() => indicator.remove(), 600);
-        }
+        // Touch indicator functionality removed for Pi consistency
 
         function exitAdminKioskMode() {
             console.log('🚪 Attempting to exit admin kiosk mode...');

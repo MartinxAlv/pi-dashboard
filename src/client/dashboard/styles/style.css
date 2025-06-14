@@ -23,6 +23,16 @@ body {
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
+    cursor: none; /* Hide cursor by default for Pi displays */
+}
+
+/* Auto-hide cursor functionality */
+body.show-cursor {
+    cursor: default;
+}
+
+body.show-cursor * {
+    cursor: inherit;
 }
 
 .dashboard {

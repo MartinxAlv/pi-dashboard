@@ -21,6 +21,7 @@ body {
     background: linear-gradient(135deg, var(--background-start) 0%, var(--background-end) 100%);
     min-height: 100vh;
     color: var(--text-color);
+    /* Normal cursor behavior for admin dashboard - always visible for editing */
 }
 
 .admin-container {

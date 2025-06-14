@@ -18,6 +18,7 @@ class Dashboard {
         this.countdownInterval = null; // Touch pause countdown
         this.touchPauseClickHandler = null; // Touch pause click handler
         this.originalAutoCycleSetting = true; // Store original auto-cycle setting for touch pause
+        this.cursorHideTimer = null; // Timer for auto-hiding cursor
         
         this.init();
     }
@@ -34,6 +35,7 @@ class Dashboard {
         this.loadTheme(); // Load saved theme
         this.updateCycleButton(); // Initialize pause button state
         this.setupTouchPause(); // Setup touch-to-pause functionality
+        this.setupCursorAutoHide(); // Setup auto-hide cursor for Pi
         
         // Update weather every 30 minutes (instead of 10)
         this.weatherUpdateInterval = setInterval(() => {
@@ -210,9 +212,7 @@ class Dashboard {
                 return; // Don't track swipe gestures on interactive elements
             }
             
-            // Show visual touch indicator
-            const touch = e.changedTouches[0];
-            this.showTouchIndicator(touch.clientX, touch.clientY);
+            // Visual touch indicator removed for Pi consistency
             
             touchStartX = touch.clientX;
             touchStartTime = Date.now();
@@ -1356,44 +1356,52 @@ class Dashboard {
         }, duration);
     }
 
-    // Add visual touch feedback for debugging
-    showTouchIndicator(x, y) {
-        const indicator = document.createElement('div');
-        indicator.style.cssText = `
-            position: fixed;
-            left: ${x - 25}px;
-            top: ${y - 25}px;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: rgba(255, 0, 0, 0.5);
-            border: 2px solid red;
-            z-index: 9999;
-            pointer-events: none;
-            animation: touchPulse 0.6s ease-out forwards;
-        `;
+    // Touch indicator functionality removed for Pi consistency
 
-        // Add CSS animation
-        if (!document.getElementById('touch-indicator-style')) {
-            const style = document.createElement('style');
-            style.id = 'touch-indicator-style';
-            style.textContent = `
-                @keyframes touchPulse {
-                    0% { transform: scale(0.5); opacity: 1; }
-                    100% { transform: scale(2); opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
-        document.body.appendChild(indicator);
-        setTimeout(() => indicator.remove(), 600);
+    setupCursorAutoHide() {
+        // Auto-hide cursor functionality for Pi displays
+        let cursorHideDelay = 3000; // Hide cursor after 3 seconds of inactivity
+        
+        const showCursor = () => {
+            document.body.classList.add('show-cursor');
+            
+            // Clear existing timer
+            if (this.cursorHideTimer) {
+                clearTimeout(this.cursorHideTimer);
+            }
+            
+            // Set new timer to hide cursor
+            this.cursorHideTimer = setTimeout(() => {
+                document.body.classList.remove('show-cursor');
+            }, cursorHideDelay);
+        };
+        
+        const hideCursor = () => {
+            document.body.classList.remove('show-cursor');
+            if (this.cursorHideTimer) {
+                clearTimeout(this.cursorHideTimer);
+                this.cursorHideTimer = null;
+            }
+        };
+        
+        // Show cursor on mouse movement
+        document.addEventListener('mousemove', showCursor);
+        
+        // Show cursor on mouse click
+        document.addEventListener('mousedown', showCursor);
+        
+        // Hide cursor immediately on touch (for touch-only devices)
+        document.addEventListener('touchstart', hideCursor);
+        
+        // Start with cursor hidden (typical for Pi kiosk mode)
+        document.body.classList.remove('show-cursor');
     }
 
     destroy() {
         this.stopAutoCycle();
         if (this.weatherUpdateInterval) clearInterval(this.weatherUpdateInterval);
         if (this.calendarUpdateInterval) clearInterval(this.calendarUpdateInterval);
+        if (this.cursorHideTimer) clearTimeout(this.cursorHideTimer);
         if (this.socket) this.socket.disconnect();
         
         // Clean up status element
